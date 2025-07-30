@@ -77,6 +77,7 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
 }
 
 function MultipleFaces({ count, isARMode = false }) {
+    const [isARSessionActive, setIsARSessionActive] = useState(false)
     const [faces, setFaces] = useState(() => {
         const faceImages = ['/faces/face1.png', '/faces/face2.png']
         
@@ -96,6 +97,15 @@ function MultipleFaces({ count, isARMode = false }) {
                 faceImage: faceImages[i % faceImages.length]
             }
         })
+    })
+
+    useFrame((state) => {
+        if (isARMode) {
+            const isCurrentlyInAR = state.gl.xr && state.gl.xr.isPresenting
+            if (isCurrentlyInAR !== isARSessionActive) {
+                setIsARSessionActive(isCurrentlyInAR)
+            }
+        }
     })
 
     // Load textures
@@ -124,6 +134,10 @@ function MultipleFaces({ count, isARMode = false }) {
 
     const handleFaceReachPlayer = (faceId) => {
         setFaces(prevFaces => prevFaces.filter(face => face.id !== faceId))
+    }
+
+    if (isARMode && !isARSessionActive) {
+        return null
     }
 
     return (
@@ -199,10 +213,15 @@ function SimpleARButton({ isSupported }) {
 
     return (
         <button
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            className="w-full h-full bg-transparent text-white font-bold text-lg flex flex-col items-center justify-center hover:bg-black hover:bg-opacity-20 transition-colors duration-200"
             onClick={startAR}
         >
-            Start AR
+            <div className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg mb-4 pointer-events-none">
+                Tap Anywhere to Start AR
+            </div>
+            <div className="text-sm opacity-75 text-center max-w-md pointer-events-none">
+                Touch the screen to activate AR mode and spawn face sprites around you
+            </div>
         </button>
     )
 }
@@ -230,9 +249,15 @@ export default function ARPage() {
 
     return (
         <div className="w-full h-screen bg-black">
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
-                <SimpleARButton isSupported={isSupported} />
-            </div>
+            {isSupported ? (
+                <div className="absolute inset-0 z-10">
+                    <SimpleARButton isSupported={isSupported} />
+                </div>
+            ) : (
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+                    <SimpleARButton isSupported={isSupported} />
+                </div>
+            )}
 
             <Canvas camera={{ position: [0, 2, 5], fov: 75 }}>
                 {isSupported ? (
@@ -247,9 +272,6 @@ export default function ARPage() {
             <div className="absolute bottom-4 left-4 right-4 text-white text-center z-10">
                 {isSupported ? (
                     <>
-                        <p className="text-sm">
-                            Tap "Start AR" to view through your camera. Face sprites will spawn around you and approach your position.
-                        </p>
                         <p className="text-xs mt-2 opacity-75">
                             Make sure to allow camera permissions when prompted
                         </p>
