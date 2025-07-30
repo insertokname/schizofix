@@ -10,7 +10,7 @@ const store = createXRStore()
 
 const randomFloat = (min, max) => Math.random() * (max - min) + min;
 
-function SpinningCube({ initialPosition, speed, color = "hotpink", id, isARMode = false, faceTexture, onReachPlayer }) {
+function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onReachPlayer }) {
     const meshRef = useRef()
     const [startPosition] = useState(initialPosition)
     const [hasReachedPlayer, setHasReachedPlayer] = useState(false)
@@ -76,8 +76,8 @@ function SpinningCube({ initialPosition, speed, color = "hotpink", id, isARMode 
     )
 }
 
-function MultipleCubes({ count, isARMode = false }) {
-    const [cubes, setCubes] = useState(() => {
+function MultipleFaces({ count, isARMode = false }) {
+    const [faces, setFaces] = useState(() => {
         const faceImages = ['/faces/face1.png', '/faces/face2.png']
         
         return Array.from({ length: count }, (_, i) => {
@@ -105,10 +105,10 @@ function MultipleCubes({ count, isARMode = false }) {
         const loader = new THREE.TextureLoader()
         const texturePromises = {}
         
-        cubes.forEach(cube => {
-            if (!textures[cube.faceImage]) {
-                texturePromises[cube.faceImage] = new Promise((resolve) => {
-                    loader.load(cube.faceImage, resolve)
+        faces.forEach(face => {
+            if (!textures[face.faceImage]) {
+                texturePromises[face.faceImage] = new Promise((resolve) => {
+                    loader.load(face.faceImage, resolve)
                 })
             }
         })
@@ -120,22 +120,22 @@ function MultipleCubes({ count, isARMode = false }) {
             })
             setTextures(prev => ({ ...prev, ...newTextures }))
         })
-    }, [cubes])
+    }, [faces])
 
     const handleFaceReachPlayer = (faceId) => {
-        setCubes(prevCubes => prevCubes.filter(cube => cube.id !== faceId))
+        setFaces(prevFaces => prevFaces.filter(face => face.id !== faceId))
     }
 
     return (
         <>
-            {cubes.map(cube => (
-                textures[cube.faceImage] && (
-                    <SpinningCube
-                        key={cube.id}
-                        id={cube.id}
-                        initialPosition={cube.initialPosition}
-                        speed={cube.speed}
-                        faceTexture={textures[cube.faceImage]}
+            {faces.map(face => (
+                textures[face.faceImage] && (
+                    <Face
+                        key={face.id}
+                        id={face.id}
+                        initialPosition={face.initialPosition}
+                        speed={face.speed}
+                        faceTexture={textures[face.faceImage]}
                         isARMode={isARMode}
                         onReachPlayer={handleFaceReachPlayer}
                     />
@@ -148,7 +148,7 @@ function MultipleCubes({ count, isARMode = false }) {
 function Fallback3DScene() {
     return (
         <>
-            <MultipleCubes count={20} isARMode={false} />
+            <MultipleFaces count={20} isARMode={false} />
 
             <Grid
                 args={[20, 20]}
@@ -177,7 +177,7 @@ function Fallback3DScene() {
 function ARScene() {
     return (
         <>
-            <MultipleCubes count={20} isARMode={true} />
+            <MultipleFaces count={20} isARMode={true} />
             <ambientLight intensity={0.5} />
             <directionalLight position={[10, 10, 5]} intensity={1} />
         </>
