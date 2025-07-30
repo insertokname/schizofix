@@ -164,7 +164,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     const lastThrowTime = useRef(0)
     const [facePositions, setFacePositions] = useState({})
     const [faces, setFaces] = useState(() => {
-        const faceImages = ['/faces/face1.png', '/faces/face2.png']
+        const faceImages = ['/faces/face1.png', '/faces/face2.png', '/faces/face3.png', '/faces/face4.png']
 
         return Array.from({ length: count }, (_, i) => {
             const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
