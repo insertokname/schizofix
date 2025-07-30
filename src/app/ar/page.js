@@ -10,7 +10,7 @@ const store = createXRStore()
 
 const randomFloat = (min, max) => Math.random() * (max - min) + min
 
-function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn }) {
+function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, faces, onHitFace }) {
     const meshRef = useRef()
     const velocityRef = useRef({ ...initialVelocity })
     const [hasDespawned, setHasDespawned] = useState(false)
@@ -23,6 +23,21 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn }) {
             meshRef.current.position.x += velocityRef.current.x * delta
             meshRef.current.position.y += velocityRef.current.y * delta
             meshRef.current.position.z += velocityRef.current.z * delta
+
+            if (faces && onHitFace) {
+                faces.forEach(face => {
+                    const distance = meshRef.current.position.distanceTo(
+                        new THREE.Vector3(face.position.x, face.position.y, face.position.z)
+                    )
+                    
+                    if (distance < 1.2) {
+                        console.log(`Sphere ${id} hit face ${face.id}! Enemy destroyed!`)
+                        onHitFace(face.id)
+                        setHasDespawned(true)
+                        onDespawn(id)
+                    }
+                })
+            }
 
             if (meshRef.current.position.y < -100) {
                 setHasDespawned(true)
@@ -43,7 +58,7 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn }) {
     )
 }
 
-function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onReachPlayer }) {
+function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onReachPlayer, onPositionUpdate }) {
     const meshRef = useRef()
     const [startPosition] = useState(initialPosition)
     const [hasReachedPlayer, setHasReachedPlayer] = useState(false)
@@ -92,6 +107,15 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
                 meshRef.current.position.x += normalizedDirection.x * speed * delta
                 meshRef.current.position.y += normalizedDirection.y * speed * delta
                 meshRef.current.position.z += normalizedDirection.z * speed * delta
+
+                // Update position for collision detection
+                if (onPositionUpdate) {
+                    onPositionUpdate(id, {
+                        x: meshRef.current.position.x,
+                        y: meshRef.current.position.y,
+                        z: meshRef.current.position.z
+                    })
+                }
             }
         }
     })
@@ -113,6 +137,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     const [spheres, setSpheres] = useState([])
     const sphereIdCounter = useRef(0)
     const lastThrowTime = useRef(0)
+    const [facePositions, setFacePositions] = useState({})
     const [faces, setFaces] = useState(() => {
         const faceImages = ['/faces/face1.png', '/faces/face2.png']
 
@@ -232,9 +257,31 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
         setFaces(prevFaces => prevFaces.filter(face => face.id !== faceId))
     }
 
+    const handleFacePositionUpdate = (faceId, position) => {
+        setFacePositions(prev => ({
+            ...prev,
+            [faceId]: position
+        }))
+    }
+
+    const handleFaceHit = (faceId) => {
+        setFaces(prevFaces => prevFaces.filter(face => face.id !== faceId))
+        setFacePositions(prev => {
+            const newPositions = { ...prev }
+            delete newPositions[faceId]
+            return newPositions
+        })
+    }
+
     const handleSphereDespawn = (sphereId) => {
         setSpheres(prevSpheres => prevSpheres.filter(sphere => sphere.id !== sphereId))
     }
+
+    // Create face data for collision detection
+    const facesForCollision = faces.map(face => ({
+        id: face.id,
+        position: facePositions[face.id] || face.initialPosition
+    }))
 
     if (isARMode && !isARSessionActive) {
         return null
@@ -252,6 +299,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
                         faceTexture={textures[face.faceImage]}
                         isARMode={isARMode}
                         onReachPlayer={handleFaceReachPlayer}
+                        onPositionUpdate={handleFacePositionUpdate}
                     />
                 )
             ))}
@@ -262,6 +310,8 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
                     initialPosition={sphere.initialPosition}
                     initialVelocity={sphere.initialVelocity}
                     onDespawn={handleSphereDespawn}
+                    faces={facesForCollision}
+                    onHitFace={handleFaceHit}
                 />
             ))}
         </>
