@@ -4,6 +4,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { createXRStore, XR } from '@react-three/xr'
 import { OrbitControls, Grid } from '@react-three/drei'
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import * as THREE from 'three'
 
 const store = createXRStore()
@@ -45,7 +46,7 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, face
                     const distance = meshRef.current.position.distanceTo(
                         new THREE.Vector3(face.position.x, face.position.y, face.position.z)
                     )
-                    
+
                     if (distance < 1.2) {
                         console.log(`Sphere ${id} hit face ${face.id}! Enemy destroyed!`)
                         onHitFace(face.id)
@@ -72,7 +73,7 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, face
                 <sphereGeometry args={[0.1]} />
                 <meshStandardMaterial transparent={true} opacity={0} depthWrite={false} />
             </mesh>
-            
+
             {pillTexture && (
                 <mesh ref={billboardRef} position={[initialPosition.x, initialPosition.y, initialPosition.z]}>
                     <planeGeometry args={[0.3, 0.3]} />
@@ -157,17 +158,31 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
     )
 }
 
-function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
+function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
     const [isARSessionActive, setIsARSessionActive] = useState(false)
     const [spheres, setSpheres] = useState([])
     const sphereIdCounter = useRef(0)
     const lastThrowTime = useRef(0)
     const [facePositions, setFacePositions] = useState({})
+    
+    const defaultFaceList = [
+        '/faces/face1.png',
+        '/faces/face2.png',
+        '/faces/face3.png',
+        '/faces/face4.png',
+        '/faces/face5.png',
+        '/faces/face6.png'
+    ]
+    
     const [faces, setFaces] = useState(() => {
-        const faceImages = ['/faces/face1.png', '/faces/face2.png', '/faces/face3.png', '/faces/face4.png']
+        let faceImages = faceList || defaultFaceList
+        
+        if (faceImages.length > 0 && typeof faceImages[0] === 'object') {
+            faceImages = faceImages.map(face => face.image || face.faceImage || face.src)
+        }
 
-        return Array.from({ length: count }, (_, i) => {
-            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
+        return faceImages.map((faceImage, i) => {
+            const angle = (Math.PI * 2 * i) / faceImages.length + Math.random() * 0.5
             const distance = 20
             const height = Math.random() * 4 + 1
 
@@ -179,10 +194,24 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
                     z: Math.sin(angle) * distance
                 },
                 speed: randomFloat(1.2, 1.5),
-                faceImage: faceImages[i % faceImages.length]
+                faceImage: faceImage,
+                lives: 2,
+                spawnCount: 0
             }
         })
     })
+
+    const generateRandomSpawnPosition = () => {
+        const angle = Math.random() * Math.PI * 2
+        const distance = 15 + Math.random() * 10 
+        const height = Math.random() * 4 + 1 
+
+        return {
+            x: Math.cos(angle) * distance,
+            y: height,
+            z: Math.sin(angle) * distance
+        }
+    }
 
     const handleThrowSphere = (cameraPosition, cameraDirection) => {
         const throwForce = 10
@@ -279,7 +308,44 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     }, [faces])
 
     const handleFaceReachPlayer = (faceId) => {
-        setFaces(prevFaces => prevFaces.filter(face => face.id !== faceId))
+        setFaces(prevFaces => {
+            const faceIndex = prevFaces.findIndex(face => face.id === faceId)
+            if (faceIndex === -1) return prevFaces
+            
+            const face = prevFaces[faceIndex]
+            const newLives = face.lives - 1
+            
+            console.log(`Face ${faceId} reached player! Lives: ${face.lives} -> ${newLives}`)
+            
+            if (newLives <= 0) {
+                console.log(`Face ${faceId} completely despawned (no lives left)`)
+                setFacePositions(prev => {
+                    const newPositions = { ...prev }
+                    delete newPositions[faceId]
+                    return newPositions
+                })
+                return prevFaces.filter(f => f.id !== faceId)
+            }
+            
+            console.log(`Face ${faceId} respawning with ${newLives} lives left`)
+            
+            const newFaces = [...prevFaces]
+            newFaces[faceIndex] = {
+                ...face,
+                lives: newLives,
+                initialPosition: generateRandomSpawnPosition(),
+                speed: randomFloat(1.2, 1.5),
+                spawnCount: face.spawnCount + 1
+            }
+            
+            setFacePositions(prev => {
+                const newPositions = { ...prev }
+                delete newPositions[faceId]
+                return newPositions
+            })
+            
+            return newFaces
+        })
     }
 
     const handleFacePositionUpdate = (faceId, position) => {
@@ -290,11 +356,43 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     }
 
     const handleFaceHit = (faceId) => {
-        setFaces(prevFaces => prevFaces.filter(face => face.id !== faceId))
-        setFacePositions(prev => {
-            const newPositions = { ...prev }
-            delete newPositions[faceId]
-            return newPositions
+        setFaces(prevFaces => {
+            const faceIndex = prevFaces.findIndex(face => face.id === faceId)
+            if (faceIndex === -1) return prevFaces
+            
+            const face = prevFaces[faceIndex]
+            const newLives = face.lives - 1
+            
+            console.log(`Face ${faceId} was shot! Lives: ${face.lives} -> ${newLives}`)
+            
+            if (newLives <= 0) {
+                console.log(`Face ${faceId} completely despawned (no lives left)`)
+                setFacePositions(prev => {
+                    const newPositions = { ...prev }
+                    delete newPositions[faceId]
+                    return newPositions
+                })
+                return prevFaces.filter(f => f.id !== faceId)
+            }
+            
+            console.log(`Face ${faceId} respawning with ${newLives} lives left`)
+            
+            const newFaces = [...prevFaces]
+            newFaces[faceIndex] = {
+                ...face,
+                lives: newLives,
+                initialPosition: generateRandomSpawnPosition(),
+                speed: randomFloat(1.2, 1.5),
+                spawnCount: face.spawnCount + 1
+            }
+            
+            setFacePositions(prev => {
+                const newPositions = { ...prev }
+                delete newPositions[faceId]
+                return newPositions
+            })
+            
+            return newFaces
         })
     }
 
@@ -317,7 +415,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
             {faces.map(face => (
                 textures[face.faceImage] && (
                     <Face
-                        key={face.id}
+                        key={`${face.id}-${face.spawnCount}`}
                         id={face.id}
                         initialPosition={face.initialPosition}
                         speed={face.speed}
@@ -343,10 +441,10 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     )
 }
 
-function Fallback3DScene({ onCanvasClick }) {
+function Fallback3DScene({ onCanvasClick, faceList }) {
     return (
         <>
-            <MultipleFaces count={20} isARMode={false} onCanvasClick={onCanvasClick} />
+            <MultipleFaces isARMode={false} onCanvasClick={onCanvasClick} faceList={faceList} />
 
             <Grid
                 args={[20, 20]}
@@ -372,7 +470,7 @@ function Fallback3DScene({ onCanvasClick }) {
     )
 }
 
-function ARScene({ onCanvasClick, onARStateChange }) {
+function ARScene({ onCanvasClick, onARStateChange, faceList }) {
     const [isARActive, setIsARActive] = useState(false)
     const touchHandlerSetupRef = useRef(false)
 
@@ -470,7 +568,7 @@ function ARScene({ onCanvasClick, onARStateChange }) {
 
     return (
         <>
-            <MultipleFaces count={20} isARMode={true} onCanvasClick={onCanvasClick} />
+            <MultipleFaces isARMode={true} onCanvasClick={onCanvasClick} faceList={faceList} />
             <ambientLight intensity={0.5} />
             <directionalLight position={[10, 10, 5]} intensity={1} />
         </>
@@ -506,9 +604,22 @@ function SimpleARButton({ isSupported }) {
 }
 
 export default function ARPage() {
+    const searchParams = useSearchParams()
     const [isSupported, setIsSupported] = useState(null)
     const [isARActive, setIsARActive] = useState(false)
     const canvasClickHandlerRef = useRef(null)
+    
+    const [faceList, setFaceList] = useState(null)
+    
+    useEffect(() => {
+        const facesParam = searchParams.get('faces')
+        if (facesParam) {
+            const faceImages = facesParam.split(',').map(face => face.trim()).filter(face => face.length > 0)
+            setFaceList(faceImages)
+        } else {
+            setFaceList(null)
+        }
+    }, [searchParams])
 
     useEffect(() => {
         if (navigator.xr) {
@@ -568,10 +679,14 @@ export default function ARPage() {
                             <ARScene
                                 onCanvasClick={canvasClickHandlerRef}
                                 onARStateChange={setIsARActive}
+                                faceList={faceList}
                             />
                         </XR>
                     ) : (
-                        <Fallback3DScene onCanvasClick={canvasClickHandlerRef} />
+                        <Fallback3DScene 
+                            onCanvasClick={canvasClickHandlerRef} 
+                            faceList={faceList}
+                        />
                     )}
                 </Canvas>
             </div>

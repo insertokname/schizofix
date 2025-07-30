@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useRef } from 'react'
+import { useLocations } from '../providers/LocationsProvider'
 
 const MapComponent = dynamic(() => import('./MapComponent'), {
   ssr: false,
@@ -170,6 +171,10 @@ export default function MapPage() {
   const [shouldRecenter, setShouldRecenter] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [joystickMode, setJoystickMode] = useState(false)
+  
+  const { initializeLocations, isInitialized, clearSavedLocations } = useLocations()
+  const hasInitializedLocations = useRef(false)
+  const ignoreGPSUpdates = useRef(false)
 
   useEffect(() => {
     startLocationWatch()
@@ -181,9 +186,18 @@ export default function MapPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (hasUserLocation && !hasInitializedLocations.current && !isInitialized) {
+      console.log('Initializing locations for the first time...')
+      initializeLocations(coordinates.lat, coordinates.lng)
+      hasInitializedLocations.current = true
+    }
+  }, [hasUserLocation, coordinates.lat, coordinates.lng, initializeLocations, isInitialized])
+
   const startLocationWatch = () => {
     setLocationError(null)
     setIsLoading(true)
+    ignoreGPSUpdates.current = false
     
     if (navigator.geolocation) {
       const options = {
@@ -194,6 +208,8 @@ export default function MapPage() {
 
       const id = navigator.geolocation.watchPosition(
         (position) => {
+          if (ignoreGPSUpdates.current) return
+
           setCoordinates({
             lat: position.coords.latitude,
             lng: position.coords.longitude
@@ -249,8 +265,10 @@ export default function MapPage() {
       navigator.geolocation.clearWatch(watchId)
       setIsWatching(false)
       setWatchId(null)
+      ignoreGPSUpdates.current = true
     } else {
       setJoystickMode(false)
+      ignoreGPSUpdates.current = false
       setShouldRecenter(true)
       startLocationWatch()
     }
@@ -259,9 +277,11 @@ export default function MapPage() {
   const handleJoystickToggle = () => {
     if (joystickMode) {
       setJoystickMode(false)
+      ignoreGPSUpdates.current = false
       setShouldRecenter(true)
       startLocationWatch()
     } else {
+      ignoreGPSUpdates.current = true
       if (watchId) {
         navigator.geolocation.clearWatch(watchId)
         setWatchId(null)
@@ -322,6 +342,21 @@ export default function MapPage() {
                 Recenter
               </button>
             )}
+            
+            <button
+              onClick={() => {
+                clearSavedLocations()
+                hasInitializedLocations.current = false
+                if (hasUserLocation) {
+                  initializeLocations(coordinates.lat, coordinates.lng)
+                  hasInitializedLocations.current = true
+                }
+              }}
+              className="px-3 py-2 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors shadow-lg"
+              title="Clear saved locations and fetch new ones"
+            >
+              Refresh Places
+            </button>
           </div>
 
           <MapComponent 

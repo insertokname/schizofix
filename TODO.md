@@ -1,3 +1,8 @@
 - ceva care iti da damage
 - heal
 - final boss
+- sanity ++ 
+- sanity -- (lovitura fata)
+- bosi level de sanity
+- ca sa iti mai creasca sanity-ul trb sa bati un bos intr-un parc
+- alb negru filtru ar

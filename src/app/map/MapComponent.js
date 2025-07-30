@@ -1,6 +1,8 @@
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import L from 'leaflet'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useLocations } from '../providers/LocationsProvider'
 import 'leaflet/dist/leaflet.css'
 
 delete L.Icon.Default.prototype._getIconUrl
@@ -12,7 +14,7 @@ L.Icon.Default.mergeOptions({
 
 function ChangeView({ center, zoom, shouldCenter = false, onCentered }) {
   const map = useMap()
-  
+
   useEffect(() => {
     if (shouldCenter) {
       map.setView(center, zoom)
@@ -21,12 +23,117 @@ function ChangeView({ center, zoom, shouldCenter = false, onCentered }) {
       }
     }
   }, [center, zoom, map, shouldCenter, onCentered])
-  
+
   return null
 }
 
 export default function MapComponent({ coordinates, hasUserLocation, initialCenter = false, onCentered }) {
   const position = [coordinates.lat, coordinates.lng]
+  const { getLocationsNear, calculateDistance, isLoading, error } = useLocations()
+  const [nearbyPlaces, setNearbyPlaces] = useState([])
+  const [hasRedirected, setHasRedirected] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    if (coordinates.lat && coordinates.lng) {
+      const nearby = getLocationsNear(coordinates.lat, coordinates.lng, 1) // 1km radius
+      setNearbyPlaces(nearby)
+    }
+  }, [coordinates.lat, coordinates.lng, getLocationsNear])
+
+  useEffect(() => {
+    if (coordinates.lat && coordinates.lng && !hasRedirected) {
+      const closeDistance = 0.025 // 25 metri
+      
+      nearbyPlaces.forEach(place => {
+        const distanceToPlace = calculateDistance(
+          coordinates.lat,
+          coordinates.lng,
+          place.lat,
+          place.lng
+        )
+        
+        if (distanceToPlace <= closeDistance) {
+          setHasRedirected(true)
+          router.push(`/ar?faces=${encodeURIComponent(place.faceImage)}`)
+        }
+      })
+    }
+  }, [coordinates.lat, coordinates.lng, nearbyPlaces, calculateDistance, router, hasRedirected])
+
+  const capitalizeFirst = (str) => {
+    return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, ' ')
+  }
+
+  const createCustomIcon = (place, distance) => {
+    const closeDistance = 0.025 // 25 metri
+
+    let opacity = 1
+    let blur = 0
+    let pixelate = 0
+    let size = 40
+    let brightness = 1
+
+    if (distance > closeDistance) {
+      blur = 2
+      pixelate = 8
+      size = 50
+    }
+
+    return new L.DivIcon({
+      html: `
+        <div style="
+          width: ${size}px; 
+          height: ${size}px; 
+          background-image: url('${place.faceImage}'); 
+          background-size: cover; 
+          background-position: center;
+          opacity: ${opacity};
+          filter: blur(${blur}px) brightness(${brightness}) contrast(0.8);
+          border-radius: 50%;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          border: 2px solid #fff;
+          image-rendering: pixelated;
+          image-rendering: -moz-crisp-edges;
+          image-rendering: crisp-edges;
+          transform: scale(1);
+          ${pixelate > 0 ? `
+            background-size: ${Math.floor(size/pixelate)}px ${Math.floor(size/pixelate)}px;
+            background-repeat: repeat;
+          ` : ''}
+        "></div>
+        ${pixelate > 0 ? `
+          <div style="
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: ${size}px;
+            height: ${size}px;
+            background: repeating-linear-gradient(
+              0deg,
+              transparent,
+              transparent 2px,
+              rgba(0,0,0,0.1) 2px,
+              rgba(0,0,0,0.1) 4px
+            ),
+            repeating-linear-gradient(
+              90deg,
+              transparent,
+              transparent 2px,
+              rgba(0,0,0,0.1) 2px,
+              rgba(0,0,0,0.1) 4px
+            );
+            border-radius: 50%;
+            pointer-events: none;
+          "></div>
+        ` : ''}
+      `,
+      className: 'custom-face-marker',
+      iconSize: [size, size],
+      iconAnchor: [size / 2, size / 2],
+      popupAnchor: [0, -size / 2]
+    })
+  }
 
   return (
     <MapContainer
@@ -35,18 +142,16 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
       style={{ height: '100vh', width: '100%' }}
       className="z-0"
     >
-      <ChangeView 
-        center={position} 
-        zoom={13} 
+      <ChangeView
+        center={position}
+        zoom={13}
         shouldCenter={initialCenter}
         onCentered={onCentered}
       />
-      
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      
       <Marker position={position}>
         <Popup>
           <div className="text-center">
@@ -58,6 +163,74 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
           </div>
         </Popup>
       </Marker>
+
+      {nearbyPlaces.map((place) => {
+        const distanceToPlace = calculateDistance(
+          coordinates.lat,
+          coordinates.lng,
+          place.lat,
+          place.lng
+        )
+        return (
+          <Marker
+            key={place.id}
+            position={[place.lat, place.lng]}
+            icon={createCustomIcon(place, distanceToPlace)}
+          >
+            <Popup>
+              <div className="text-center">
+                <div className="mb-2">
+                  <img 
+                    src={place.faceImage} 
+                    alt="Character face" 
+                    className="w-16 h-16 rounded-full mx-auto border-2 border-gray-300"
+                  />
+                </div>
+                <strong>{place.name}</strong>
+                <br />
+                <span className="text-sm text-gray-600">
+                  {capitalizeFirst(place.type)}
+                </span>
+                <br />
+                <span className="text-xs text-blue-600">
+                  {(distanceToPlace * 1000).toFixed(0)}m away
+                </span>
+                {place.tags?.cuisine && (
+                  <>
+                    <br />
+                    <span className="text-xs text-gray-500">
+                      Cuisine: {place.tags.cuisine}
+                    </span>
+                  </>
+                )}
+                {place.tags?.opening_hours && (
+                  <>
+                    <br />
+                    <span className="text-xs text-gray-500">
+                      Hours: {place.tags.opening_hours}
+                    </span>
+                  </>
+                )}
+              </div>
+            </Popup>
+          </Marker>
+        )
+      })}
+
+      {isLoading && (
+        <div className="absolute top-4 right-4 z-[1000] bg-white bg-opacity-90 px-3 py-2 rounded-lg shadow-lg">
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+            <span className="text-sm text-gray-700">Loading places...</span>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute top-4 right-4 z-[1000] bg-red-500 bg-opacity-90 text-white px-3 py-2 rounded-lg shadow-lg">
+          <span className="text-sm">Error: {error}</span>
+        </div>
+      )}
     </MapContainer>
   )
 }
