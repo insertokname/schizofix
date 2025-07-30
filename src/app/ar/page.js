@@ -4,37 +4,151 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { createXRStore, XR } from '@react-three/xr'
 import { OrbitControls, Grid } from '@react-three/drei'
 import { useState, useEffect, useRef } from 'react'
+import * as THREE from 'three'
 
 const store = createXRStore()
 
-function SpinningCube() {
+const randomFloat = (min, max) => Math.random() * (max - min) + min;
+
+function SpinningCube({ initialPosition, speed, color = "hotpink", id, isARMode = false, faceTexture, onReachPlayer }) {
     const meshRef = useRef()
+    const [startPosition] = useState(initialPosition)
+    const [hasReachedPlayer, setHasReachedPlayer] = useState(false)
 
-    useFrame((state) => {
-        if (meshRef.current) {
-            meshRef.current.rotation.x += 0.01
-            meshRef.current.rotation.y += 0.01
+    useFrame((state, delta) => {
+        if (meshRef.current && !hasReachedPlayer) {
+            const playerPosition = isARMode 
+                ? {
+                    x: state.camera.position.x,
+                    y: state.camera.position.y,
+                    z: state.camera.position.z
+                }
+                : {
+                    x: 0,
+                    y: 0,
+                    z: 0
+                }
 
-            const time = state.clock.getElapsedTime()
-            const radius = 5
-            meshRef.current.position.x = Math.cos(time * 0.5) * radius
-            meshRef.current.position.y = 15
-            meshRef.current.position.z = Math.sin(time * 0.5) * radius
+            meshRef.current.lookAt(playerPosition.x, playerPosition.y, playerPosition.z)
+
+            const directionToPlayer = {
+                x: playerPosition.x - meshRef.current.position.x,
+                y: playerPosition.y - meshRef.current.position.y,
+                z: playerPosition.z - meshRef.current.position.z
+            }
+
+            const distanceToPlayer = Math.sqrt(
+                directionToPlayer.x ** 2 +
+                directionToPlayer.y ** 2 +
+                directionToPlayer.z ** 2
+            )
+
+            if (distanceToPlayer < 0.5 && !hasReachedPlayer) {
+                console.log(`Face ${id} has reached the ${isARMode ? 'camera' : 'origin'}!`)
+                setHasReachedPlayer(true)
+                onReachPlayer(id)
+                return
+            }
+
+            if (distanceToPlayer > 0.1) {
+                const normalizedDirection = {
+                    x: directionToPlayer.x / distanceToPlayer,
+                    y: directionToPlayer.y / distanceToPlayer,
+                    z: directionToPlayer.z / distanceToPlayer
+                }
+
+                meshRef.current.position.x += normalizedDirection.x * speed * delta
+                meshRef.current.position.y += normalizedDirection.y * speed * delta
+                meshRef.current.position.z += normalizedDirection.z * speed * delta
+            }
         }
     })
 
+    if (hasReachedPlayer) {
+        return null
+    }
+
     return (
-        <mesh ref={meshRef}>
-            <boxGeometry args={[0.5, 0.5, 0.5]} />
-            <meshStandardMaterial color="hotpink" />
+        <mesh ref={meshRef} position={[startPosition.x, startPosition.y, startPosition.z]}>
+            <planeGeometry args={[2, 2]} />
+            <meshBasicMaterial map={faceTexture} transparent={true} side={THREE.DoubleSide} />
         </mesh>
+    )
+}
+
+function MultipleCubes({ count, isARMode = false }) {
+    const [cubes, setCubes] = useState(() => {
+        const faceImages = ['/faces/face1.png', '/faces/face2.png']
+        
+        return Array.from({ length: count }, (_, i) => {
+            const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
+            const distance = 20
+            const height = Math.random() * 4 + 1
+
+            return {
+                id: i,
+                initialPosition: {
+                    x: Math.cos(angle) * distance,
+                    y: height,
+                    z: Math.sin(angle) * distance
+                },
+                speed: randomFloat(1.2, 1.5),
+                faceImage: faceImages[i % faceImages.length]
+            }
+        })
+    })
+
+    // Load textures
+    const [textures, setTextures] = useState({})
+
+    useEffect(() => {
+        const loader = new THREE.TextureLoader()
+        const texturePromises = {}
+        
+        cubes.forEach(cube => {
+            if (!textures[cube.faceImage]) {
+                texturePromises[cube.faceImage] = new Promise((resolve) => {
+                    loader.load(cube.faceImage, resolve)
+                })
+            }
+        })
+
+        Promise.all(Object.values(texturePromises)).then((loadedTextures) => {
+            const newTextures = {}
+            Object.keys(texturePromises).forEach((imagePath, index) => {
+                newTextures[imagePath] = loadedTextures[index]
+            })
+            setTextures(prev => ({ ...prev, ...newTextures }))
+        })
+    }, [cubes])
+
+    const handleFaceReachPlayer = (faceId) => {
+        setCubes(prevCubes => prevCubes.filter(cube => cube.id !== faceId))
+    }
+
+    return (
+        <>
+            {cubes.map(cube => (
+                textures[cube.faceImage] && (
+                    <SpinningCube
+                        key={cube.id}
+                        id={cube.id}
+                        initialPosition={cube.initialPosition}
+                        speed={cube.speed}
+                        faceTexture={textures[cube.faceImage]}
+                        isARMode={isARMode}
+                        onReachPlayer={handleFaceReachPlayer}
+                    />
+                )
+            ))}
+        </>
     )
 }
 
 function Fallback3DScene() {
     return (
         <>
-            <SpinningCube />
+            <MultipleCubes count={20} isARMode={false} />
 
             <Grid
                 args={[20, 20]}
@@ -63,7 +177,7 @@ function Fallback3DScene() {
 function ARScene() {
     return (
         <>
-            <SpinningCube />
+            <MultipleCubes count={20} isARMode={true} />
             <ambientLight intensity={0.5} />
             <directionalLight position={[10, 10, 5]} intensity={1} />
         </>
@@ -94,7 +208,7 @@ function SimpleARButton({ isSupported }) {
 }
 
 export default function ARPage() {
-    const [isSupported, setIsSupported] = useState(null) // null = checking, false = not supported, true = supported
+    const [isSupported, setIsSupported] = useState(null)
 
     useEffect(() => {
         if (navigator.xr) {
@@ -134,7 +248,7 @@ export default function ARPage() {
                 {isSupported ? (
                     <>
                         <p className="text-sm">
-                            Tap "Start AR" to view through your camera. You should see a pink cube in AR space.
+                            Tap "Start AR" to view through your camera. Face sprites will spawn around you and approach your position.
                         </p>
                         <p className="text-xs mt-2 opacity-75">
                             Make sure to allow camera permissions when prompted

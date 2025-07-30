@@ -1,0 +1,3 @@
+- ceva care iti da damage
+- heal
+- final boss
