@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { LocationsProvider } from "./providers/LocationsProvider";
+import { GameProgressProvider } from "./providers/GameProgressProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,9 +24,11 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <LocationsProvider>
-          {children}
-        </LocationsProvider>
+        <GameProgressProvider>
+          <LocationsProvider>
+            {children}
+          </LocationsProvider>
+        </GameProgressProvider>
       </body>
     </html>
   );

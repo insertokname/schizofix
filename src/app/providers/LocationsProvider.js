@@ -48,6 +48,19 @@ const setStoredLocations = (value) => {
     return false
 }
 
+const setStoredBossLocations = (value) => {
+    try {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('gameBossLocations', JSON.stringify(value))
+            return true
+        }
+    } catch (error) {
+        console.error('Failed to save boss locations to localStorage:', error)
+        return false
+    }
+    return false
+}
+
 const getStoredLocations = () => {
     try {
         if (typeof window !== 'undefined') {
@@ -63,6 +76,21 @@ const getStoredLocations = () => {
     return null
 }
 
+const getStoredBossLocations = () => {
+    try {
+        if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('gameBossLocations')
+            if (stored) {
+                const parsed = JSON.parse(stored)
+                return parsed
+            }
+        }
+    } catch (error) {
+        console.error('Error getting stored boss locations:', error)
+    }
+    return null
+}
+
 const clearStoredLocations = () => {
     try {
         if (typeof window !== 'undefined') {
@@ -73,13 +101,26 @@ const clearStoredLocations = () => {
     }
 }
 
+const clearStoredBossLocations = () => {
+    try {
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('gameBossLocations')
+        }
+    } catch (error) {
+        console.error('Failed to clear stored boss locations:', error)
+    }
+}
+
 export function LocationsProvider({ children }) {
     const [locations, setLocations] = useState([])
+    const [bossLocations, setBossLocations] = useState([])
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState(null)
     const [isInitialized, setIsInitialized] = useState(false)
+    const [bossLocationsInitialized, setBossLocationsInitialized] = useState(false)
 
     const placeTypes = ['pub', 'restaurant', 'cafe', 'supermarket', 'hotel', 'place_of_worship']
+    const bossPlaceTypes = ['park', 'playground']
 
     const getRandomFace = () => {
         const randomIndex = Math.floor(Math.random() * FACE_IMAGES.length)
@@ -167,6 +208,142 @@ export function LocationsProvider({ children }) {
         }
     }
 
+    const fetchBossLocations = async (lat, lng) => {
+        setIsLoading(true)
+        setError(null)
+
+        try {
+            const outerRadius = 5000 // Larger radius for boss locations
+            const innerRadius = 100
+            const query = `
+        [out:json][timeout:25];
+        (
+          ${bossPlaceTypes.map(type =>
+                `nwr["leisure"="${type}"](around:${outerRadius},${lat},${lng});`
+            ).join('')}
+        );
+        out geom;
+      `
+
+            const response = await fetch('https://overpass-api.de/api/interpreter', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `data=${encodeURIComponent(query)}`,
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            const data = await response.json()
+
+            const places = data.elements.map(element => {
+                let lat, lng
+
+                if (element.type === 'node') {
+                    lat = element.lat
+                    lng = element.lon
+                } else if (element.type === 'way' && element.geometry) {
+                    const coords = element.geometry
+                    lat = coords.reduce((sum, point) => sum + point.lat, 0) / coords.length
+                    lng = coords.reduce((sum, point) => sum + point.lon, 0) / coords.length
+                } else if (element.type === 'relation' && element.members) {
+                    const nodeMembers = element.members.filter(m => m.type === 'node' && m.lat && m.lon)
+                    if (nodeMembers.length > 0) {
+                        lat = nodeMembers.reduce((sum, member) => sum + member.lat, 0) / nodeMembers.length
+                        lng = nodeMembers.reduce((sum, member) => sum + member.lon, 0) / nodeMembers.length
+                    }
+                }
+
+                return {
+                    id: element.id,
+                    lat,
+                    lng,
+                    name: element.tags?.name || 'Unnamed',
+                    type: element.tags?.leisure || 'unknown',
+                    tags: element.tags,
+                    bossImage: `/faces/boss${Math.floor(Math.random() * 4) + 1}.png`, // Random boss image
+                    fetchedAt: new Date().toISOString()
+                }
+            }).filter(place => {
+                if (!place.lat || !place.lng) return false
+
+                // Calculate distance from user location
+                const distance = calculateDistance(lat, lng, place.lat, place.lng) * 1000 // Convert to meters
+
+                // Only include places between 100m and 5000m
+                return distance >= innerRadius && distance <= outerRadius
+            })
+
+            return places
+        } catch (error) {
+            console.error('Error fetching boss locations:', error)
+            throw error
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const initializeBossLocations = async (userLat, userLng) => {
+        if (bossLocationsInitialized) return
+
+        setIsLoading(true)
+        setError(null)
+
+        try {
+            const savedBossLocations = getStoredBossLocations()
+
+            if (savedBossLocations && Array.isArray(savedBossLocations) && savedBossLocations.length > 0) {
+                // Sort saved boss locations by distance from user
+                const sortedBossLocations = savedBossLocations
+                    .map(location => ({
+                        ...location,
+                        distance: calculateDistance(userLat, userLng, location.lat, location.lng)
+                    }))
+                    .sort((a, b) => a.distance - b.distance)
+                
+                setBossLocations(sortedBossLocations)
+            } else {
+                const newBossLocations = await fetchBossLocations(userLat, userLng)
+                
+                // Sort new boss locations by distance from user
+                const sortedBossLocations = newBossLocations
+                    .map(location => ({
+                        ...location,
+                        distance: calculateDistance(userLat, userLng, location.lat, location.lng)
+                    }))
+                    .sort((a, b) => a.distance - b.distance)
+
+                setBossLocations(sortedBossLocations)
+                setStoredBossLocations(sortedBossLocations)
+            }
+
+            setBossLocationsInitialized(true)
+        } catch (err) {
+            setError(err.message)
+            console.error('Failed to initialize boss locations:', err)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const getNextBossLocation = () => {
+        if (bossLocations.length === 0) return null
+        return bossLocations[0]
+    }
+
+    const moveFirstBossLocationToBack = () => {
+        if (bossLocations.length <= 1) return
+
+        const updatedBossLocations = [...bossLocations.slice(1), bossLocations[0]]
+        setBossLocations(updatedBossLocations)
+        setStoredBossLocations(updatedBossLocations)
+        
+        return updatedBossLocations
+    }
+
     const initializeLocations = async (userLat, userLng) => {
         if (isInitialized) return
 
@@ -200,6 +377,12 @@ export function LocationsProvider({ children }) {
         setIsInitialized(false)
     }
 
+    const clearSavedBossLocations = () => {
+        clearStoredBossLocations()
+        setBossLocations([])
+        setBossLocationsInitialized(false)
+    }
+
     const getLocationsNear = (userLat, userLng, radiusKm = 2) => {
         return locations.filter(location => {
             const distance = calculateDistance(userLat, userLng, location.lat, location.lng)
@@ -215,12 +398,18 @@ export function LocationsProvider({ children }) {
 
     const value = {
         locations,
+        bossLocations,
         isLoading,
         error,
         isInitialized,
+        bossLocationsInitialized,
         initializeLocations,
+        initializeBossLocations,
         clearSavedLocations,
+        clearSavedBossLocations,
         getLocationsNear,
+        getNextBossLocation,
+        moveFirstBossLocationToBack,
         calculateDistance,
         removeLocation
     }

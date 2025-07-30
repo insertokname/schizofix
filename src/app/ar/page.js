@@ -5,6 +5,7 @@ import { createXRStore, XR } from '@react-three/xr'
 import { OrbitControls, Grid } from '@react-three/drei'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { useGameProgress } from '../providers/GameProgressProvider'
 import * as THREE from 'three'
 
 const store = createXRStore()
@@ -272,6 +273,7 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
 
 function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) {
     const router = useRouter()
+    const { gameProgress, incrementDefeatedEnemies, incrementCurrentBossNumber } = useGameProgress()
     const [isARSessionActive, setIsARSessionActive] = useState(false)
     const [spheres, setSpheres] = useState([])
     const sphereIdCounter = useRef(0)
@@ -310,10 +312,16 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
                 isBoss: true
             }]
         } else {
-            let faceImages = faceList || defaultFaceList
+            let allFaceImages = faceList ? [...faceList] : []
+            
+            const currentBossNumber = gameProgress?.currentBossNumber || 0
+            for (let i = 0; i < currentBossNumber; i++) {
+                const randomFaceImage = defaultFaceList[Math.floor(Math.random() * defaultFaceList.length)]
+                allFaceImages.push(randomFaceImage)
+            }
 
-            return faceImages.map((faceImage, i) => {
-                const angle = (Math.PI * 2 * i) / faceImages.length + randomFloat(0, 0.5)
+            return allFaceImages.map((faceImage, i) => {
+                const angle = (Math.PI * 2 * i) / allFaceImages.length + randomFloat(0, 0.5)
                 const distance = 10
                 const height = randomFloat(1, 5)
 
@@ -557,6 +565,16 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
 
         setFaces(prevFaces => {
             const onWon = () => {
+                const wasBossLevel = bossPath !== null && bossPath !== undefined
+                
+                if (wasBossLevel) {
+                    incrementCurrentBossNumber(1)
+                    console.log(`Boss level completed! Boss number incremented.`)
+                } else {
+                    incrementDefeatedEnemies(1)
+                    console.log(`Normal face level completed! Defeated enemies incremented.`)
+                }
+                
                 router.push('/map');
             };
 

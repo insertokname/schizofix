@@ -172,8 +172,9 @@ export default function MapPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [joystickMode, setJoystickMode] = useState(false)
 
-  const { initializeLocations, isInitialized, clearSavedLocations } = useLocations()
+  const { initializeLocations, initializeBossLocations, isInitialized, bossLocationsInitialized, clearSavedLocations, clearSavedBossLocations } = useLocations()
   const hasInitializedLocations = useRef(false)
+  const hasInitializedBossLocations = useRef(false)
   const ignoreGPSUpdates = useRef(false)
 
   useEffect(() => {
@@ -193,6 +194,14 @@ export default function MapPage() {
       hasInitializedLocations.current = true
     }
   }, [hasUserLocation, coordinates.lat, coordinates.lng, initializeLocations, isInitialized])
+
+  useEffect(() => {
+    if (hasUserLocation && !hasInitializedBossLocations.current && !bossLocationsInitialized) {
+      console.log('Initializing boss locations for the first time...')
+      initializeBossLocations(coordinates.lat, coordinates.lng)
+      hasInitializedBossLocations.current = true
+    }
+  }, [hasUserLocation, coordinates.lat, coordinates.lng, initializeBossLocations, bossLocationsInitialized])
 
   const startLocationWatch = () => {
     setLocationError(null)
@@ -346,10 +355,14 @@ export default function MapPage() {
             <button
               onClick={() => {
                 clearSavedLocations()
+                clearSavedBossLocations()
                 hasInitializedLocations.current = false
+                hasInitializedBossLocations.current = false
                 if (hasUserLocation) {
                   initializeLocations(coordinates.lat, coordinates.lng)
+                  initializeBossLocations(coordinates.lat, coordinates.lng)
                   hasInitializedLocations.current = true
+                  hasInitializedBossLocations.current = true
                 }
               }}
               className="px-3 py-2 text-sm bg-white text-black border border-black rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
