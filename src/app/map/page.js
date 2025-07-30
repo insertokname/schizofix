@@ -30,18 +30,18 @@ function Joystick({ onMove }) {
         const currentTime = Date.now()
         const deltaTime = (currentTime - lastTimeRef.current) / 1000 // Convert to seconds
         lastTimeRef.current = currentTime
-        
+
         const baseSpeed = 0.00005
         const deltaLat = -position.y * baseSpeed * deltaTime * (Math.abs(position.y) / maxDistance)
         const deltaLng = position.x * baseSpeed * deltaTime * (Math.abs(position.x) / maxDistance)
-        
+
         onMove(deltaLat, deltaLng)
-        
+
         if (isDragging && (position.x !== 0 || position.y !== 0)) {
           animationFrameRef.current = requestAnimationFrame(updateMovement)
         }
       }
-      
+
       lastTimeRef.current = Date.now()
       animationFrameRef.current = requestAnimationFrame(updateMovement)
     } else {
@@ -102,15 +102,15 @@ function Joystick({ onMove }) {
     const rect = joystickRef.current.getBoundingClientRect()
     const centerX = rect.width / 2
     const centerY = rect.height / 2
-    
+
     const clientX = e.clientX || e.pageX
     const clientY = e.clientY || e.pageY
-    
+
     const x = clientX - rect.left - centerX
     const y = clientY - rect.top - centerY
-    
+
     const distance = Math.sqrt(x * x + y * y)
-    
+
     if (distance <= maxDistance) {
       setPosition({ x, y })
     } else {
@@ -128,7 +128,7 @@ function Joystick({ onMove }) {
       document.addEventListener('mouseup', handleMouseUp)
       document.addEventListener('touchmove', handleTouchMove, { passive: false })
       document.addEventListener('touchend', handleTouchEnd, { passive: false })
-      
+
       return () => {
         document.removeEventListener('mousemove', handleMouseMove)
         document.removeEventListener('mouseup', handleMouseUp)
@@ -171,14 +171,14 @@ export default function MapPage() {
   const [shouldRecenter, setShouldRecenter] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [joystickMode, setJoystickMode] = useState(false)
-  
+
   const { initializeLocations, isInitialized, clearSavedLocations } = useLocations()
   const hasInitializedLocations = useRef(false)
   const ignoreGPSUpdates = useRef(false)
 
   useEffect(() => {
     startLocationWatch()
-    
+
     return () => {
       if (watchId) {
         navigator.geolocation.clearWatch(watchId)
@@ -198,7 +198,7 @@ export default function MapPage() {
     setLocationError(null)
     setIsLoading(true)
     ignoreGPSUpdates.current = false
-    
+
     if (navigator.geolocation) {
       const options = {
         enableHighAccuracy: true,
@@ -226,22 +226,22 @@ export default function MapPage() {
         (error) => {
           console.error('Error getting location:', error)
           let errorMessage = 'Could not get your location. '
-          
-          switch(error.code) {
+
+          switch (error.code) {
             case 1:
               errorMessage += 'Location access was denied. Please enable location permissions in your browser settings.'
               break
-            case 2: 
+            case 2:
               errorMessage += 'Location information is unavailable.'
               break
-            case 3: 
+            case 3:
               errorMessage += 'Location request timed out.'
               break
             default:
               errorMessage += 'An unknown error occurred.'
               break
           }
-          
+
           setLocationError(errorMessage)
           setHasUserLocation(false)
           setIsWatching(false)
@@ -249,7 +249,7 @@ export default function MapPage() {
         },
         options
       )
-      
+
       setWatchId(id)
     } else {
       const errorMessage = 'Geolocation is not supported by this browser.'
@@ -342,7 +342,7 @@ export default function MapPage() {
                 Recenter
               </button>
             )}
-            
+
             <button
               onClick={() => {
                 clearSavedLocations()
@@ -359,9 +359,9 @@ export default function MapPage() {
             </button>
           </div>
 
-          <MapComponent 
-            coordinates={coordinates} 
-            hasUserLocation={hasUserLocation} 
+          <MapComponent
+            coordinates={coordinates}
+            hasUserLocation={hasUserLocation}
             initialCenter={shouldRecenter}
             onCentered={() => setShouldRecenter(false)}
           />
@@ -381,27 +381,27 @@ export default function MapPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
-              
+
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Location Access Required</h2>
               <p className="text-gray-600 mb-6">
-                This interactive map application requires access to your location to provide live tracking. 
+                This interactive map application requires access to your location to provide live tracking.
                 Please allow location access to start real-time location updates.
               </p>
-              
+
               <button
                 onClick={handleLocationClick}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium mb-4"
               >
                 Try Again
               </button>
-              
+
               <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded text-red-700 text-sm">
                 <strong>Error:</strong> {locationError}
                 <div className="mt-2 text-xs">
                   Please check your browser settings and ensure location permissions are enabled for this site.
                 </div>
               </div>
-              
+
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <a
                   href="/"

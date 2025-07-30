@@ -148,10 +148,10 @@ export function LocationsProvider({ children }) {
                 }
             }).filter(place => {
                 if (!place.lat || !place.lng) return false
-                
+
                 // Calculate distance from user location
                 const distance = calculateDistance(lat, lng, place.lat, place.lng) * 1000 // Convert to meters
-                
+
                 // Only include places between 100m and 2000m
                 return distance >= innerRadius && distance <= outerRadius
             })
@@ -205,6 +205,12 @@ export function LocationsProvider({ children }) {
         })
     }
 
+    const removeLocation = (locationId) => {
+        const updatedLocations = locations.filter(location => location.id !== locationId)
+        setLocations(updatedLocations)
+        setStoredLocations(updatedLocations)
+    }
+
     const value = {
         locations,
         isLoading,
@@ -213,7 +219,8 @@ export function LocationsProvider({ children }) {
         initializeLocations,
         clearSavedLocations,
         getLocationsNear,
-        calculateDistance
+        calculateDistance,
+        removeLocation
     }
 
     return (

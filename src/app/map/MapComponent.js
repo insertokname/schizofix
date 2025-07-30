@@ -29,37 +29,52 @@ function ChangeView({ center, zoom, shouldCenter = false, onCentered }) {
 
 export default function MapComponent({ coordinates, hasUserLocation, initialCenter = false, onCentered }) {
   const position = [coordinates.lat, coordinates.lng]
-  const { getLocationsNear, calculateDistance, isLoading, error } = useLocations()
+  const { getLocationsNear, calculateDistance, removeLocation, isLoading, error } = useLocations()
   const [nearbyPlaces, setNearbyPlaces] = useState([])
   const [hasRedirected, setHasRedirected] = useState(false)
+  const [accessedLocationIds, setAccessedLocationIds] = useState(new Set())
   const router = useRouter()
 
   useEffect(() => {
     if (coordinates.lat && coordinates.lng) {
       const nearby = getLocationsNear(coordinates.lat, coordinates.lng, 1) // 1km radius
-      setNearbyPlaces(nearby)
+      setNearbyPlaces(prevNearby => {
+        if (prevNearby.length === 0) {
+          return nearby
+        }
+        return prevNearby
+      })
     }
   }, [coordinates.lat, coordinates.lng, getLocationsNear])
 
   useEffect(() => {
     if (coordinates.lat && coordinates.lng && !hasRedirected) {
       const closeDistance = 0.025 // 25 metri
-      
+
       nearbyPlaces.forEach(place => {
+        if (accessedLocationIds.has(place.id)) {
+          return
+        }
+
         const distanceToPlace = calculateDistance(
           coordinates.lat,
           coordinates.lng,
           place.lat,
           place.lng
         )
-        
+
         if (distanceToPlace <= closeDistance) {
           setHasRedirected(true)
-          router.push(`/ar?faces=${encodeURIComponent(place.faceImage)}`)
+          setAccessedLocationIds(prev => new Set(prev).add(place.id))
+          removeLocation(place.id)
+
+          setTimeout(() => {
+            router.push(`/ar?faces=${encodeURIComponent(place.faceImage)}`)
+          }, 1000)
         }
       })
     }
-  }, [coordinates.lat, coordinates.lng, nearbyPlaces, calculateDistance, router, hasRedirected])
+  }, [coordinates.lat, coordinates.lng, nearbyPlaces, calculateDistance, removeLocation, router, hasRedirected, accessedLocationIds])
 
   const capitalizeFirst = (str) => {
     return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, ' ')
@@ -98,7 +113,7 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
           image-rendering: crisp-edges;
           transform: scale(1);
           ${pixelate > 0 ? `
-            background-size: ${Math.floor(size/pixelate)}px ${Math.floor(size/pixelate)}px;
+            background-size: ${Math.floor(size / pixelate)}px ${Math.floor(size / pixelate)}px;
             background-repeat: repeat;
           ` : ''}
         "></div>
@@ -180,9 +195,9 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
             <Popup>
               <div className="text-center">
                 <div className="mb-2">
-                  <img 
-                    src={place.faceImage} 
-                    alt="Character face" 
+                  <img
+                    src={place.faceImage}
+                    alt="Character face"
                     className="w-16 h-16 rounded-full mx-auto border-2 border-gray-300"
                   />
                 </div>

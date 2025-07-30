@@ -4,12 +4,72 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { createXRStore, XR } from '@react-three/xr'
 import { OrbitControls, Grid } from '@react-three/drei'
 import { useState, useEffect, useRef } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import * as THREE from 'three'
 
 const store = createXRStore()
 
 const randomFloat = (min, max) => Math.random() * (max - min) + min
+
+function HitEffect({ type, startTime, isARMode }) {
+    const meshRef = useRef()
+    const [isVisible, setIsVisible] = useState(true)
+
+    useFrame((state) => {
+        if (!meshRef.current || !startTime) return
+
+        const elapsed = (Date.now() - startTime) / 1000
+        const duration = type === 'red' ? 0.5 : 2.0
+
+        if (elapsed >= duration) {
+            setIsVisible(false)
+            return
+        }
+
+        let opacity = 1
+        if (type === 'red') {
+            opacity = elapsed <= 0.25 ? elapsed * 4 : (0.5 - elapsed) * 4
+        } else {
+            const cycle = (elapsed * 4) % 1
+            opacity = cycle <= 0.5 ? cycle * 2 : (1 - cycle) * 2
+        }
+
+        opacity = Math.max(0, Math.min(1, opacity))
+        meshRef.current.material.opacity = opacity * (isARMode ? 0.8 : 0.3)
+
+        // Position relative to camera for consistent visibility
+        if (isARMode) {
+            const camera = state.camera
+            const distance = 1.5
+            const forward = new THREE.Vector3(0, 0, -1)
+            forward.applyQuaternion(camera.quaternion)
+
+            meshRef.current.position.copy(camera.position)
+            meshRef.current.position.add(forward.multiplyScalar(distance))
+            meshRef.current.lookAt(camera.position)
+        }
+    })
+
+    if (!isVisible) return null
+
+    const color = type === 'red' ? '#ff0000' : '#00ff00'
+    const size = isARMode ? 3 : 15
+
+    return (
+        <mesh ref={meshRef} position={isARMode ? [0, 0, -1.5] : [0, 0, 0]}>
+            <planeGeometry args={[size, size]} />
+            <meshBasicMaterial
+                color={color}
+                transparent={true}
+                opacity={isARMode ? 0.8 : 0.3}
+                side={THREE.DoubleSide}
+                depthTest={false}
+                depthWrite={false}
+                blending={THREE.AdditiveBlending}
+            />
+        </mesh>
+    )
+}
 
 function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, faces, onHitFace }) {
     const meshRef = useRef()
@@ -159,12 +219,14 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
 }
 
 function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
+    const router = useRouter()
     const [isARSessionActive, setIsARSessionActive] = useState(false)
     const [spheres, setSpheres] = useState([])
     const sphereIdCounter = useRef(0)
     const lastThrowTime = useRef(0)
     const [facePositions, setFacePositions] = useState({})
-    
+    const [hitEffect, setHitEffect] = useState(null)
+
     const defaultFaceList = [
         '/faces/face1.png',
         '/faces/face2.png',
@@ -173,17 +235,17 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
         '/faces/face5.png',
         '/faces/face6.png'
     ]
-    
+
     const [faces, setFaces] = useState(() => {
         let faceImages = faceList || defaultFaceList
-        
+
         if (faceImages.length > 0 && typeof faceImages[0] === 'object') {
             faceImages = faceImages.map(face => face.image || face.faceImage || face.src)
         }
 
         return faceImages.map((faceImage, i) => {
             const angle = (Math.PI * 2 * i) / faceImages.length + Math.random() * 0.5
-            const distance = 20
+            const distance = 10
             const height = Math.random() * 4 + 1
 
             return {
@@ -203,8 +265,8 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
 
     const generateRandomSpawnPosition = () => {
         const angle = Math.random() * Math.PI * 2
-        const distance = 15 + Math.random() * 10 
-        const height = Math.random() * 4 + 1 
+        const distance = 15 + Math.random() * 10
+        const height = Math.random() * 4 + 1
 
         return {
             x: Math.cos(angle) * distance,
@@ -308,44 +370,42 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
     }, [faces])
 
     const handleFaceReachPlayer = (faceId) => {
-        setFaces(prevFaces => {
-            const faceIndex = prevFaces.findIndex(face => face.id === faceId)
-            if (faceIndex === -1) return prevFaces
-            
-            const face = prevFaces[faceIndex]
-            const newLives = face.lives - 1
-            
-            console.log(`Face ${faceId} reached player! Lives: ${face.lives} -> ${newLives}`)
-            
-            if (newLives <= 0) {
-                console.log(`Face ${faceId} completely despawned (no lives left)`)
-                setFacePositions(prev => {
-                    const newPositions = { ...prev }
-                    delete newPositions[faceId]
-                    return newPositions
-                })
-                return prevFaces.filter(f => f.id !== faceId)
-            }
-            
-            console.log(`Face ${faceId} respawning with ${newLives} lives left`)
-            
-            const newFaces = [...prevFaces]
-            newFaces[faceIndex] = {
-                ...face,
-                lives: newLives,
-                initialPosition: generateRandomSpawnPosition(),
-                speed: randomFloat(1.2, 1.5),
-                spawnCount: face.spawnCount + 1
-            }
-            
-            setFacePositions(prev => {
-                const newPositions = { ...prev }
-                delete newPositions[faceId]
-                return newPositions
-            })
-            
-            return newFaces
-        })
+        console.log(`Face ${faceId} hit the player! Showing hit effect and reloading...`)
+
+        // Show 3D red hit effect
+        setHitEffect({ type: 'red', startTime: Date.now() })
+
+        // Also show DOM overlay for non-AR mode
+        if (!isARSessionActive) {
+            const hitOverlay = document.createElement('div')
+            hitOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 9999;
+                background: radial-gradient(circle, transparent 60%, rgba(255, 0, 0, 0.8) 100%);
+                animation: hitFlash 0.5s ease-out;
+            `
+
+            const style = document.createElement('style')
+            style.textContent = `
+                @keyframes hitFlash {
+                    0% { opacity: 0; }
+                    50% { opacity: 1; }
+                    100% { opacity: 0; }
+                }
+            `
+            document.head.appendChild(style)
+            document.body.appendChild(hitOverlay)
+        }
+
+        // Remove overlay and reload page after animation
+        setTimeout(() => {
+            window.location.reload()
+        }, 500)
     }
 
     const handleFacePositionUpdate = (faceId, position) => {
@@ -356,15 +416,64 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
     }
 
     const handleFaceHit = (faceId) => {
+        console.log(`Face ${faceId} was hit! Showing green hit effect...`)
+
+        // Show 3D green hit effect
+        setHitEffect({ type: 'green', startTime: Date.now() })
+
+        // Clear the effect after 2 seconds
+        setTimeout(() => {
+            setHitEffect(null)
+        }, 2000)
+
+        // Also show DOM overlay for non-AR mode
+        if (!isARSessionActive) {
+            const hitOverlay = document.createElement('div')
+            hitOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 9999;
+                background: radial-gradient(circle, transparent 60%, rgba(0, 255, 0, 0.6) 100%);
+                animation: greenHitFlash 2s ease-out;
+            `
+
+            const style = document.createElement('style')
+            style.textContent = `
+                @keyframes greenHitFlash {
+                    0% { opacity: 0; }
+                    25% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                    75% { opacity: 1; }
+                    100% { opacity: 0; }
+                }
+            `
+            document.head.appendChild(style)
+            document.body.appendChild(hitOverlay)
+
+            setTimeout(() => {
+                if (hitOverlay.parentNode) {
+                    hitOverlay.parentNode.removeChild(hitOverlay)
+                }
+            }, 2000)
+        }
+
         setFaces(prevFaces => {
+            const onWon = () => {
+                router.push('/map');
+            };
+
             const faceIndex = prevFaces.findIndex(face => face.id === faceId)
             if (faceIndex === -1) return prevFaces
-            
+
             const face = prevFaces[faceIndex]
             const newLives = face.lives - 1
-            
+
             console.log(`Face ${faceId} was shot! Lives: ${face.lives} -> ${newLives}`)
-            
+
             if (newLives <= 0) {
                 console.log(`Face ${faceId} completely despawned (no lives left)`)
                 setFacePositions(prev => {
@@ -372,11 +481,67 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
                     delete newPositions[faceId]
                     return newPositions
                 })
-                return prevFaces.filter(f => f.id !== faceId)
+                const remainingFaces = prevFaces.filter(f => f.id !== faceId)
+
+                if (remainingFaces.length === 0) {
+                    console.log("🎉 ALL FACES HAVE BEEN DEFEATED! VICTORY! 🎉")
+
+                    // Check if running on Android and in AR session
+                    const isAndroid = /Android/i.test(navigator.userAgent)
+
+                    if (isAndroid) {
+                        // For Android, try multiple approaches to exit AR
+                        try {
+                            // Method 1: Try to exit through the store
+                            if (store && store.getState && store.getState().gl?.xr?.isPresenting) {
+                                const session = store.getState().gl.xr.getSession()
+                                if (session) {
+                                    session.end().then(() => {
+                                        console.log("AR session ended successfully")
+                                        setTimeout(() => onWon(), 100)
+                                    }).catch((err) => {
+                                        console.warn("Session end failed:", err)
+                                        onWon()
+                                    })
+                                } else {
+                                    onWon()
+                                }
+                            }
+                            // Method 2: Try through navigator.xr
+                            else if (navigator.xr) {
+                                navigator.xr.isSessionSupported('immersive-ar').then(supported => {
+                                    if (supported) {
+                                        // Try to end any active sessions
+                                        const endSession = () => {
+                                            if (document.exitFullscreen) {
+                                                document.exitFullscreen().catch(() => { })
+                                            }
+                                            onWon()
+                                        }
+                                        setTimeout(endSession, 100)
+                                    } else {
+                                        onWon()
+                                    }
+                                }).catch(() => {
+                                    onWon()
+                                })
+                            } else {
+                                onWon()
+                            }
+                        } catch (error) {
+                            console.warn("AR exit failed:", error)
+                            onWon()
+                        }
+                    } else {
+                        onWon()
+                    }
+                }
+
+                return remainingFaces
             }
-            
+
             console.log(`Face ${faceId} respawning with ${newLives} lives left`)
-            
+
             const newFaces = [...prevFaces]
             newFaces[faceIndex] = {
                 ...face,
@@ -385,13 +550,13 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
                 speed: randomFloat(1.2, 1.5),
                 spawnCount: face.spawnCount + 1
             }
-            
+
             setFacePositions(prev => {
                 const newPositions = { ...prev }
                 delete newPositions[faceId]
                 return newPositions
             })
-            
+
             return newFaces
         })
     }
@@ -412,6 +577,13 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
 
     return (
         <>
+            {hitEffect && (
+                <HitEffect
+                    type={hitEffect.type}
+                    startTime={hitEffect.startTime}
+                    isARMode={isARMode && isARSessionActive}
+                />
+            )}
             {faces.map(face => (
                 textures[face.faceImage] && (
                     <Face
@@ -608,9 +780,9 @@ export default function ARPage() {
     const [isSupported, setIsSupported] = useState(null)
     const [isARActive, setIsARActive] = useState(false)
     const canvasClickHandlerRef = useRef(null)
-    
+
     const [faceList, setFaceList] = useState(null)
-    
+
     useEffect(() => {
         const facesParam = searchParams.get('faces')
         if (facesParam) {
@@ -683,8 +855,8 @@ export default function ARPage() {
                             />
                         </XR>
                     ) : (
-                        <Fallback3DScene 
-                            onCanvasClick={canvasClickHandlerRef} 
+                        <Fallback3DScene
+                            onCanvasClick={canvasClickHandlerRef}
                             faceList={faceList}
                         />
                     )}
