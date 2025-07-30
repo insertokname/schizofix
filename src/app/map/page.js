@@ -30,7 +30,6 @@ function Joystick({ onMove }) {
         const deltaTime = (currentTime - lastTimeRef.current) / 1000 // Convert to seconds
         lastTimeRef.current = currentTime
         
-        // Base speed units per second (adjusted for reasonable movement)
         const baseSpeed = 0.00005
         const deltaLat = -position.y * baseSpeed * deltaTime * (Math.abs(position.y) / maxDistance)
         const deltaLng = position.x * baseSpeed * deltaTime * (Math.abs(position.x) / maxDistance)
