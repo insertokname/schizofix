@@ -12,9 +12,18 @@ const randomFloat = (min, max) => Math.random() * (max - min) + min
 
 function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, faces, onHitFace }) {
     const meshRef = useRef()
+    const billboardRef = useRef()
     const velocityRef = useRef({ ...initialVelocity })
     const [hasDespawned, setHasDespawned] = useState(false)
+    const [pillTexture, setPillTexture] = useState(null)
     const gravity = -15
+
+    useEffect(() => {
+        const loader = new THREE.TextureLoader()
+        loader.load('/pill.png', (texture) => {
+            setPillTexture(texture)
+        })
+    }, [])
 
     useFrame((state, delta) => {
         if (meshRef.current && !hasDespawned) {
@@ -23,6 +32,13 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, face
             meshRef.current.position.x += velocityRef.current.x * delta
             meshRef.current.position.y += velocityRef.current.y * delta
             meshRef.current.position.z += velocityRef.current.z * delta
+
+            // Update billboard position to match the sphere
+            if (billboardRef.current) {
+                billboardRef.current.position.copy(meshRef.current.position)
+                // Make billboard face the camera
+                billboardRef.current.lookAt(state.camera.position)
+            }
 
             if (faces && onHitFace) {
                 faces.forEach(face => {
@@ -51,10 +67,19 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, face
     }
 
     return (
-        <mesh ref={meshRef} position={[initialPosition.x, initialPosition.y, initialPosition.z]}>
-            <sphereGeometry args={[0.1]} />
-            <meshStandardMaterial color="red" />
-        </mesh>
+        <group>
+            <mesh ref={meshRef} position={[initialPosition.x, initialPosition.y, initialPosition.z]}>
+                <sphereGeometry args={[0.1]} />
+                <meshStandardMaterial transparent={true} opacity={0} depthWrite={false} />
+            </mesh>
+            
+            {pillTexture && (
+                <mesh ref={billboardRef} position={[initialPosition.x, initialPosition.y, initialPosition.z]}>
+                    <planeGeometry args={[0.3, 0.3]} />
+                    <meshBasicMaterial map={pillTexture} transparent={true} side={THREE.DoubleSide} />
+                </mesh>
+            )}
+        </group>
     )
 }
 
