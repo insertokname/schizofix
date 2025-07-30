@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const MapComponent = dynamic(() => import('./MapComponent'), {
   ssr: false,
@@ -12,6 +12,155 @@ const MapComponent = dynamic(() => import('./MapComponent'), {
   )
 })
 
+function Joystick({ onMove }) {
+  const [isDragging, setIsDragging] = useState(false)
+  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const joystickRef = useRef(null)
+  const animationFrameRef = useRef(null)
+  const lastTimeRef = useRef(Date.now())
+
+  const centerX = 50
+  const centerY = 50
+  const maxDistance = 40
+
+  useEffect(() => {
+    if (isDragging && (position.x !== 0 || position.y !== 0)) {
+      const updateMovement = () => {
+        const currentTime = Date.now()
+        const deltaTime = (currentTime - lastTimeRef.current) / 1000 // Convert to seconds
+        lastTimeRef.current = currentTime
+        
+        // Base speed units per second (adjusted for reasonable movement)
+        const baseSpeed = 0.00005
+        const deltaLat = -position.y * baseSpeed * deltaTime * (Math.abs(position.y) / maxDistance)
+        const deltaLng = position.x * baseSpeed * deltaTime * (Math.abs(position.x) / maxDistance)
+        
+        onMove(deltaLat, deltaLng)
+        
+        if (isDragging && (position.x !== 0 || position.y !== 0)) {
+          animationFrameRef.current = requestAnimationFrame(updateMovement)
+        }
+      }
+      
+      lastTimeRef.current = Date.now()
+      animationFrameRef.current = requestAnimationFrame(updateMovement)
+    } else {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+        animationFrameRef.current = null
+      }
+    }
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current)
+      }
+    }
+  }, [isDragging, position, onMove])
+
+  const handleMouseDown = (e) => {
+    e.preventDefault()
+    setIsDragging(true)
+    updatePosition(e)
+  }
+
+  const handleMouseMove = (e) => {
+    if (isDragging) {
+      updatePosition(e)
+    }
+  }
+
+  const handleMouseUp = () => {
+    setIsDragging(false)
+    setPosition({ x: 0, y: 0 })
+  }
+
+  const handleTouchStart = (e) => {
+    e.preventDefault()
+    setIsDragging(true)
+    const touch = e.touches[0]
+    updatePosition(touch)
+  }
+
+  const handleTouchMove = (e) => {
+    e.preventDefault()
+    if (isDragging && e.touches[0]) {
+      const touch = e.touches[0]
+      updatePosition(touch)
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    setPosition({ x: 0, y: 0 })
+  }
+
+  const updatePosition = (e) => {
+    if (!joystickRef.current) return
+
+    const rect = joystickRef.current.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    
+    const clientX = e.clientX || e.pageX
+    const clientY = e.clientY || e.pageY
+    
+    const x = clientX - rect.left - centerX
+    const y = clientY - rect.top - centerY
+    
+    const distance = Math.sqrt(x * x + y * y)
+    
+    if (distance <= maxDistance) {
+      setPosition({ x, y })
+    } else {
+      const angle = Math.atan2(y, x)
+      setPosition({
+        x: Math.cos(angle) * maxDistance,
+        y: Math.sin(angle) * maxDistance
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.addEventListener('touchmove', handleTouchMove, { passive: false })
+      document.addEventListener('touchend', handleTouchEnd, { passive: false })
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+        document.removeEventListener('touchmove', handleTouchMove)
+        document.removeEventListener('touchend', handleTouchEnd)
+      }
+    }
+  }, [isDragging])
+
+  return (
+    <div className="relative">
+      <div
+        ref={joystickRef}
+        className="w-24 h-24 bg-gray-800 bg-opacity-70 rounded-full border-4 border-gray-600 relative cursor-pointer select-none touch-none"
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+      >
+        <div
+          className="w-6 h-6 bg-white rounded-full absolute border-2 border-gray-400 transition-transform duration-75 pointer-events-none"
+          style={{
+            left: `${centerX + position.x - 12}px`,
+            top: `${centerY + position.y - 12}px`,
+          }}
+        />
+      </div>
+      <div className="text-center mt-2 text-sm text-white bg-black bg-opacity-50 rounded px-2 py-1">
+        Joystick
+      </div>
+    </div>
+  )
+}
+
 export default function MapPage() {
   const [coordinates, setCoordinates] = useState({ lat: 40.7128, lng: -74.0060 })
   const [hasUserLocation, setHasUserLocation] = useState(false)
@@ -21,6 +170,7 @@ export default function MapPage() {
   const [lastUpdate, setLastUpdate] = useState(null)
   const [shouldRecenter, setShouldRecenter] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
+  const [joystickMode, setJoystickMode] = useState(false)
 
   useEffect(() => {
     startLocationWatch()
@@ -96,14 +246,38 @@ export default function MapPage() {
   }
 
   const handleLocationClick = () => {
-      if (isWatching && watchId) {
+    if (isWatching && watchId) {
       navigator.geolocation.clearWatch(watchId)
       setIsWatching(false)
       setWatchId(null)
     } else {
+      setJoystickMode(false)
       setShouldRecenter(true)
       startLocationWatch()
     }
+  }
+
+  const handleJoystickToggle = () => {
+    if (joystickMode) {
+      setJoystickMode(false)
+      setShouldRecenter(true)
+      startLocationWatch()
+    } else {
+      if (watchId) {
+        navigator.geolocation.clearWatch(watchId)
+        setWatchId(null)
+      }
+      setIsWatching(false)
+      setJoystickMode(true)
+    }
+  }
+
+  const handleJoystickMove = (deltaLat, deltaLng) => {
+    setCoordinates(prev => ({
+      lat: prev.lat + deltaLat,
+      lng: prev.lng + deltaLng
+    }))
+    setLastUpdate(new Date())
   }
 
   const handleRecenterClick = () => {
@@ -111,9 +285,9 @@ export default function MapPage() {
   }
 
   return (
-    <div className="relative h-screen w-full">
+    <div className="relative h-dvh w-full">
       {isLoading ? (
-        <div className="flex items-center justify-center h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="flex items-center justify-center h-dvh bg-gradient-to-br from-blue-50 to-indigo-100">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
@@ -128,51 +302,27 @@ export default function MapPage() {
         </div>
       ) : hasUserLocation ? (
         <>
-          <div className="absolute top-4 left-4 right-4 z-[1000] bg-white/90 backdrop-blur-sm rounded-lg p-4 shadow-lg">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-800">Interactive Map</h1>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleLocationClick}
-                  className={`px-4 py-2 ${isWatching ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors`}
-                >
-                  {isWatching ? 'Stop Tracking' : 'Start Tracking'}
-                </button>
-                {isWatching && (
-                  <button
-                    onClick={handleRecenterClick}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    Recenter
-                  </button>
-                )}
-                <a
-                  href="/"
-                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  Home
-                </a>
-              </div>
-            </div>
-            <div className="mt-2 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <span className="text-green-600">Using your location</span>
-                {isWatching && (
-                  <span className="flex items-center text-blue-600">
-                    <span className="animate-pulse mr-1">●</span>
-                    Live tracking
-                  </span>
-                )}
-              </div>
-              <div>
-                Lat: {coordinates.lat.toFixed(6)}, Lng: {coordinates.lng.toFixed(6)}
-              </div>
-              {lastUpdate && (
-                <div className="text-xs text-gray-500">
-                  Last updated: {lastUpdate.toLocaleTimeString()}
-                </div>
-              )}
-            </div>
+          <div className="absolute bottom-8 left-4 z-[1000] flex flex-col gap-2">
+            <button
+              onClick={handleLocationClick}
+              className={`px-3 py-2 text-sm ${isWatching ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors shadow-lg`}
+            >
+              {isWatching ? 'Stop Tracking' : 'Start Tracking'}
+            </button>
+            <button
+              onClick={handleJoystickToggle}
+              className={`px-3 py-2 text-sm ${joystickMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-orange-600 hover:bg-orange-700'} text-white rounded-lg transition-colors shadow-lg`}
+            >
+              {joystickMode ? 'Exit Joystick' : 'Joystick Mode'}
+            </button>
+            {(isWatching || joystickMode) && (
+              <button
+                onClick={handleRecenterClick}
+                className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
+              >
+                Recenter
+              </button>
+            )}
           </div>
 
           <MapComponent 
@@ -181,9 +331,15 @@ export default function MapPage() {
             initialCenter={shouldRecenter}
             onCentered={() => setShouldRecenter(false)}
           />
+
+          {joystickMode && (
+            <div className="absolute bottom-8 right-8 z-[1000]">
+              <Joystick onMove={handleJoystickMove} />
+            </div>
+          )}
         </>
       ) : locationError ? (
-        <div className="flex items-center justify-center h-screen bg-gradient-to-br from-red-50 to-orange-100">
+        <div className="flex items-center justify-center h-dvh bg-gradient-to-br from-red-50 to-orange-100">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
             <div className="text-center">
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
