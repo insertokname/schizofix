@@ -12,9 +12,11 @@
     "@react-three/drei": "^10.6.1",
     "@react-three/fiber": "^9.3.0",
     "@react-three/xr": "^6.6.20",
+    "leaflet": "^1.9.4",
     "next": "15.4.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-leaflet": "^5.0.0",
     "three": "^0.178.0"
   },
   "devDependencies": {
