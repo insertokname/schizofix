@@ -18,7 +18,9 @@ const FACE_IMAGES = [
     'face3.png',
     'face4.png',
     'face5.png',
-    'face6.png'
+    'face6.png',
+    'face7.png',
+    'face8.png'
 ]
 
 const calculateDistance = (lat1, lng1, lat2, lng2) => {

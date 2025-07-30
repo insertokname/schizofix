@@ -142,19 +142,19 @@ function Joystick({ onMove }) {
     <div className="relative">
       <div
         ref={joystickRef}
-        className="w-24 h-24 bg-gray-800 bg-opacity-70 rounded-full border-4 border-gray-600 relative cursor-pointer select-none touch-none"
+        className="w-24 h-24 bg-white bg-opacity-90 rounded-full border-4 border-black relative cursor-pointer select-none touch-none"
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
         <div
-          className="w-6 h-6 bg-white rounded-full absolute border-2 border-gray-400 transition-transform duration-75 pointer-events-none"
+          className="w-6 h-6 bg-black rounded-full absolute border-2 border-gray-400 transition-transform duration-75 pointer-events-none"
           style={{
             left: `${centerX + position.x - 12}px`,
             top: `${centerY + position.y - 12}px`,
           }}
         />
       </div>
-      <div className="text-center mt-2 text-sm text-white bg-black bg-opacity-50 rounded px-2 py-1">
+      <div className="text-center mt-2 text-sm text-black bg-white bg-opacity-90 rounded px-2 py-1 border border-black">
         Joystick
       </div>
     </div>
@@ -306,14 +306,14 @@ export default function MapPage() {
   return (
     <div className="relative h-dvh w-full">
       {isLoading ? (
-        <div className="flex items-center justify-center h-dvh bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="flex items-center justify-center h-dvh bg-black">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 mb-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-black mb-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Getting Your Location</h2>
-              <p className="text-gray-600">
+              <h2 className="text-2xl font-bold text-black mb-2">Getting Your Location</h2>
+              <p className="text-gray-800">
                 Please allow location access when prompted to start using the map.
               </p>
             </div>
@@ -324,20 +324,20 @@ export default function MapPage() {
           <div className="absolute bottom-8 left-4 z-[1000] flex flex-col gap-2">
             <button
               onClick={handleLocationClick}
-              className={`px-3 py-2 text-sm ${isWatching ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-lg transition-colors shadow-lg`}
+              className={`px-3 py-2 text-sm ${isWatching ? 'bg-black text-white border border-white hover:bg-gray-800' : 'bg-white text-black border border-black hover:bg-gray-100'} rounded-lg transition-colors shadow-lg`}
             >
               {isWatching ? 'Stop Tracking' : 'Start Tracking'}
             </button>
             <button
               onClick={handleJoystickToggle}
-              className={`px-3 py-2 text-sm ${joystickMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-orange-600 hover:bg-orange-700'} text-white rounded-lg transition-colors shadow-lg`}
+              className={`px-3 py-2 text-sm ${joystickMode ? 'bg-black text-white border border-white hover:bg-gray-800' : 'bg-white text-black border border-black hover:bg-gray-100'} rounded-lg transition-colors shadow-lg`}
             >
               {joystickMode ? 'Exit Joystick' : 'Joystick Mode'}
             </button>
             {(isWatching || joystickMode) && (
               <button
                 onClick={handleRecenterClick}
-                className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
+                className="px-3 py-2 text-sm bg-white text-black border border-black rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
               >
                 Recenter
               </button>
@@ -352,7 +352,7 @@ export default function MapPage() {
                   hasInitializedLocations.current = true
                 }
               }}
-              className="px-3 py-2 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors shadow-lg"
+              className="px-3 py-2 text-sm bg-white text-black border border-black rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
               title="Clear saved locations and fetch new ones"
             >
               Refresh Places
@@ -373,29 +373,29 @@ export default function MapPage() {
           )}
         </>
       ) : locationError ? (
-        <div className="flex items-center justify-center h-dvh bg-gradient-to-br from-red-50 to-orange-100">
+        <div className="flex items-center justify-center h-dvh bg-black">
           <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full mx-4">
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-black mb-4">
+                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Location Access Required</h2>
-              <p className="text-gray-600 mb-6">
+              <h2 className="text-2xl font-bold text-black mb-2">Location Access Required</h2>
+              <p className="text-gray-800 mb-6">
                 This interactive map application requires access to your location to provide live tracking.
                 Please allow location access to start real-time location updates.
               </p>
 
               <button
                 onClick={handleLocationClick}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium mb-4"
+                className="w-full bg-black text-white py-3 px-4 rounded-lg hover:bg-gray-800 transition-colors font-medium mb-4"
               >
                 Try Again
               </button>
 
-              <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded text-red-700 text-sm">
+              <div className="mt-4 p-3 bg-gray-100 border border-gray-300 rounded text-black text-sm">
                 <strong>Error:</strong> {locationError}
                 <div className="mt-2 text-xs">
                   Please check your browser settings and ensure location permissions are enabled for this site.
@@ -405,7 +405,7 @@ export default function MapPage() {
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <a
                   href="/"
-                  className="text-gray-500 hover:text-gray-700 transition-colors text-sm"
+                  className="text-gray-500 hover:text-black transition-colors text-sm"
                 >
                   Back to Home
                 </a>

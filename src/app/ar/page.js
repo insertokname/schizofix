@@ -144,10 +144,11 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, face
     )
 }
 
-function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onReachPlayer, onPositionUpdate }) {
+function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onReachPlayer, onPositionUpdate, isBoss = false }) {
     const meshRef = useRef()
     const [startPosition] = useState(initialPosition)
     const [hasReachedPlayer, setHasReachedPlayer] = useState(false)
+    const spinTimeRef = useRef(0)
 
     useFrame((state, delta) => {
         if (meshRef.current && !hasReachedPlayer) {
@@ -165,43 +166,94 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
 
             meshRef.current.lookAt(playerPosition.x, playerPosition.y, playerPosition.z)
 
-            const directionToPlayer = {
-                x: playerPosition.x - meshRef.current.position.x,
-                y: playerPosition.y - meshRef.current.position.y,
-                z: playerPosition.z - meshRef.current.position.z
-            }
+            // Handle boss spinning behavior
+            if (isBoss && initialPosition.isSpinning) {
+                const currentTime = Date.now()
+                const spinElapsed = currentTime - initialPosition.spinStartTime
+                
+                if (spinElapsed < initialPosition.spinDuration) {
+                    // Spinning phase - orbit around player at fixed distance
+                    // Progress from 0 to 1 over the spin duration
+                    const progress = spinElapsed / initialPosition.spinDuration
+                    // Calculate current angle based on progress and total rotation
+                    const angle = progress * initialPosition.totalRotation
+                    const distance = initialPosition.spinDistance
+                    
+                    meshRef.current.position.x = playerPosition.x + Math.cos(angle) * distance
+                    meshRef.current.position.y = initialPosition.y
+                    meshRef.current.position.z = playerPosition.z + Math.sin(angle) * distance
+                } else {
+                    // Spinning finished, resume normal approach behavior
+                    const directionToPlayer = {
+                        x: playerPosition.x - meshRef.current.position.x,
+                        y: playerPosition.y - meshRef.current.position.y,
+                        z: playerPosition.z - meshRef.current.position.z
+                    }
 
-            const distanceToPlayer = Math.sqrt(
-                directionToPlayer.x ** 2 +
-                directionToPlayer.y ** 2 +
-                directionToPlayer.z ** 2
-            )
+                    const distanceToPlayer = Math.sqrt(
+                        directionToPlayer.x ** 2 +
+                        directionToPlayer.y ** 2 +
+                        directionToPlayer.z ** 2
+                    )
 
-            if (distanceToPlayer < 0.5 && !hasReachedPlayer) {
-                setHasReachedPlayer(true)
-                onReachPlayer(id)
-                return
-            }
+                    if (distanceToPlayer < 0.5 && !hasReachedPlayer) {
+                        setHasReachedPlayer(true)
+                        onReachPlayer(id)
+                        return
+                    }
 
-            if (distanceToPlayer > 0.1) {
-                const normalizedDirection = {
-                    x: directionToPlayer.x / distanceToPlayer,
-                    y: directionToPlayer.y / distanceToPlayer,
-                    z: directionToPlayer.z / distanceToPlayer
+                    if (distanceToPlayer > 0.1) {
+                        const normalizedDirection = {
+                            x: directionToPlayer.x / distanceToPlayer,
+                            y: directionToPlayer.y / distanceToPlayer,
+                            z: directionToPlayer.z / distanceToPlayer
+                        }
+
+                        meshRef.current.position.x += normalizedDirection.x * speed * delta
+                        meshRef.current.position.y += normalizedDirection.y * speed * delta
+                        meshRef.current.position.z += normalizedDirection.z * speed * delta
+                    }
+                }
+            } else {
+                // Normal enemy behavior
+                const directionToPlayer = {
+                    x: playerPosition.x - meshRef.current.position.x,
+                    y: playerPosition.y - meshRef.current.position.y,
+                    z: playerPosition.z - meshRef.current.position.z
                 }
 
-                meshRef.current.position.x += normalizedDirection.x * speed * delta
-                meshRef.current.position.y += normalizedDirection.y * speed * delta
-                meshRef.current.position.z += normalizedDirection.z * speed * delta
+                const distanceToPlayer = Math.sqrt(
+                    directionToPlayer.x ** 2 +
+                    directionToPlayer.y ** 2 +
+                    directionToPlayer.z ** 2
+                )
 
-                // Update position for collision detection
-                if (onPositionUpdate) {
-                    onPositionUpdate(id, {
-                        x: meshRef.current.position.x,
-                        y: meshRef.current.position.y,
-                        z: meshRef.current.position.z
-                    })
+                if (distanceToPlayer < 0.5 && !hasReachedPlayer) {
+                    setHasReachedPlayer(true)
+                    onReachPlayer(id)
+                    return
                 }
+
+                if (distanceToPlayer > 0.1) {
+                    const normalizedDirection = {
+                        x: directionToPlayer.x / distanceToPlayer,
+                        y: directionToPlayer.y / distanceToPlayer,
+                        z: directionToPlayer.z / distanceToPlayer
+                    }
+
+                    meshRef.current.position.x += normalizedDirection.x * speed * delta
+                    meshRef.current.position.y += normalizedDirection.y * speed * delta
+                    meshRef.current.position.z += normalizedDirection.z * speed * delta
+                }
+            }
+
+            // Update position for collision detection
+            if (onPositionUpdate) {
+                onPositionUpdate(id, {
+                    x: meshRef.current.position.x,
+                    y: meshRef.current.position.y,
+                    z: meshRef.current.position.z
+                })
             }
         }
     })
@@ -218,7 +270,7 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
     )
 }
 
-function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
+function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) {
     const router = useRouter()
     const [isARSessionActive, setIsARSessionActive] = useState(false)
     const [spheres, setSpheres] = useState([])
@@ -233,45 +285,81 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
         '/faces/face3.png',
         '/faces/face4.png',
         '/faces/face5.png',
-        '/faces/face6.png'
+        '/faces/face6.png',
+        '/faces/face7.png',
+        '/faces/face8.png'
     ]
 
     const [faces, setFaces] = useState(() => {
-        let faceImages = faceList || defaultFaceList
+        if (bossPath) {
+            const bossAngle = randomFloat(0, Math.PI * 2)
+            const bossDistance = randomFloat(10, 15)
+            const bossHeight = randomFloat(1, 5)
 
-        if (faceImages.length > 0 && typeof faceImages[0] === 'object') {
-            faceImages = faceImages.map(face => face.image || face.faceImage || face.src)
-        }
-
-        return faceImages.map((faceImage, i) => {
-            const angle = (Math.PI * 2 * i) / faceImages.length + Math.random() * 0.5
-            const distance = 10
-            const height = Math.random() * 4 + 1
-
-            return {
-                id: i,
+            return [{
+                id: 0,
                 initialPosition: {
-                    x: Math.cos(angle) * distance,
-                    y: height,
-                    z: Math.sin(angle) * distance
+                    x: Math.cos(bossAngle) * bossDistance,
+                    y: bossHeight,
+                    z: Math.sin(bossAngle) * bossDistance
                 },
-                speed: randomFloat(1.2, 1.5),
-                faceImage: faceImage,
-                lives: 2,
-                spawnCount: 0
-            }
-        })
+                speed: randomFloat(1.5, 1.7),
+                faceImage: bossPath,
+                lives: 4,
+                spawnCount: 0,
+                isBoss: true
+            }]
+        } else {
+            let faceImages = faceList || defaultFaceList
+
+            return faceImages.map((faceImage, i) => {
+                const angle = (Math.PI * 2 * i) / faceImages.length + randomFloat(0, 0.5)
+                const distance = 10
+                const height = randomFloat(1, 5)
+
+                return {
+                    id: i,
+                    initialPosition: {
+                        x: Math.cos(angle) * distance,
+                        y: height,
+                        z: Math.sin(angle) * distance
+                    },
+                    speed: randomFloat(1.2, 1.5),
+                    faceImage: faceImage,
+                    lives: 2,
+                    spawnCount: 0,
+                    isBoss: false
+                }
+            })
+        }
     })
 
     const generateRandomSpawnPosition = () => {
-        const angle = Math.random() * Math.PI * 2
-        const distance = 15 + Math.random() * 10
-        const height = Math.random() * 4 + 1
+        const angle = randomFloat(0, Math.PI * 2)
+        const distance = randomFloat(15, 25)
+        const height = randomFloat(1, 5)
 
         return {
             x: Math.cos(angle) * distance,
             y: height,
             z: Math.sin(angle) * distance
+        }
+    }
+
+    const generateBossSpinPosition = (currentPosition) => {
+        const distance = Math.sqrt(currentPosition.x ** 2 + currentPosition.z ** 2)
+        // Random total rotation between 1 and 2 full rotations (2π to 4π radians)
+        const totalRotation = randomFloat(Math.PI * 2, Math.PI * 4)
+        
+        return {
+            x: currentPosition.x,
+            y: currentPosition.y, 
+            z: currentPosition.z,
+            spinDistance: distance,
+            isSpinning: true,
+            spinStartTime: Date.now(),
+            spinDuration: 3000, // 3 seconds of spinning
+            totalRotation: totalRotation
         }
     }
 
@@ -416,7 +504,13 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
     }
 
     const handleFaceHit = (faceId) => {
-        console.log(`Face ${faceId} was hit! Showing green hit effect...`)
+        const hitFace = faces.find(face => face.id === faceId)
+
+        if (hitFace && hitFace.isBoss) {
+            console.log(`BOSS FACE ${faceId} WAS HIT! Boss health: ${hitFace.lives} -> ${hitFace.lives - 1}`)
+        } else {
+            console.log(`Face ${faceId} was hit! Showing green hit effect...`)
+        }
 
         // Show 3D green hit effect
         setHitEffect({ type: 'green', startTime: Date.now() })
@@ -472,19 +566,46 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
             const face = prevFaces[faceIndex]
             const newLives = face.lives - 1
 
-            console.log(`Face ${faceId} was shot! Lives: ${face.lives} -> ${newLives}`)
+            let facesToReturn = [...prevFaces]
+            
+            if (face.isBoss) {
+                console.log(`BOSS Face ${faceId} was shot! Lives: ${face.lives} -> ${newLives}`)
+                
+                const newFaceId = Math.max(...prevFaces.map(f => f.id)) + 1
+                const randomFaceImage = defaultFaceList[Math.floor(Math.random() * defaultFaceList.length)]
+                const spawnPosition = generateRandomSpawnPosition()
+                
+                const newNormalFace = {
+                    id: newFaceId,
+                    initialPosition: spawnPosition,
+                    speed: randomFloat(1.2, 1.5),
+                    faceImage: randomFaceImage,
+                    lives: 1,
+                    spawnCount: 0,
+                    isBoss: false
+                }
+                
+                facesToReturn.push(newNormalFace)
+                console.log(`Spawned new normal face ${newFaceId} with 1 HP due to boss hit!`)
+            } else {
+                console.log(`Face ${faceId} was shot! Lives: ${face.lives} -> ${newLives}`)
+            }
 
             if (newLives <= 0) {
-                console.log(`Face ${faceId} completely despawned (no lives left)`)
+                if (face.isBoss) {
+                    console.log(`BOSS Face ${faceId} completely defeated! (no lives left)`)
+                } else {
+                    console.log(`Face ${faceId} completely despawned (no lives left)`)
+                }
                 setFacePositions(prev => {
                     const newPositions = { ...prev }
                     delete newPositions[faceId]
                     return newPositions
                 })
-                const remainingFaces = prevFaces.filter(f => f.id !== faceId)
+                const remainingFaces = facesToReturn.filter(f => f.id !== faceId)
 
                 if (remainingFaces.length === 0) {
-                    console.log("🎉 ALL FACES HAVE BEEN DEFEATED! VICTORY! 🎉")
+                    console.log("ALL FACES HAVE BEEN DEFEATED! VICTORY!")
 
                     // Check if running on Android and in AR session
                     const isAndroid = /Android/i.test(navigator.userAgent)
@@ -540,15 +661,21 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
                 return remainingFaces
             }
 
-            console.log(`Face ${faceId} respawning with ${newLives} lives left`)
+            if (face.isBoss) {
+                console.log(`BOSS Face ${faceId} respawning with ${newLives} lives left`)
+            } else {
+                console.log(`Face ${faceId} respawning with ${newLives} lives left`)
+            }
 
-            const newFaces = [...prevFaces]
-            newFaces[faceIndex] = {
+            facesToReturn[faceIndex] = {
                 ...face,
                 lives: newLives,
-                initialPosition: generateRandomSpawnPosition(),
-                speed: randomFloat(1.2, 1.5),
-                spawnCount: face.spawnCount + 1
+                initialPosition: face.isBoss 
+                    ? (newLives === 2 ? generateRandomSpawnPosition() : generateBossSpinPosition(facePositions[faceId] || face.initialPosition))
+                    : generateRandomSpawnPosition(),
+                speed: face.isBoss ? randomFloat(1.5, 1.7) : randomFloat(1.2, 1.5),
+                spawnCount: face.spawnCount + 1,
+                isBoss: face.isBoss
             }
 
             setFacePositions(prev => {
@@ -557,7 +684,7 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
                 return newPositions
             })
 
-            return newFaces
+            return facesToReturn
         })
     }
 
@@ -593,6 +720,7 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
                         speed={face.speed}
                         faceTexture={textures[face.faceImage]}
                         isARMode={isARMode}
+                        isBoss={face.isBoss}
                         onReachPlayer={handleFaceReachPlayer}
                         onPositionUpdate={handleFacePositionUpdate}
                     />
@@ -613,10 +741,10 @@ function MultipleFaces({ faceList, isARMode = false, onCanvasClick }) {
     )
 }
 
-function Fallback3DScene({ onCanvasClick, faceList }) {
+function Fallback3DScene({ onCanvasClick, faceList, bossPath }) {
     return (
         <>
-            <MultipleFaces isARMode={false} onCanvasClick={onCanvasClick} faceList={faceList} />
+            <MultipleFaces isARMode={false} onCanvasClick={onCanvasClick} faceList={faceList} bossPath={bossPath} />
 
             <Grid
                 args={[20, 20]}
@@ -642,7 +770,7 @@ function Fallback3DScene({ onCanvasClick, faceList }) {
     )
 }
 
-function ARScene({ onCanvasClick, onARStateChange, faceList }) {
+function ARScene({ onCanvasClick, onARStateChange, faceList, bossPath }) {
     const [isARActive, setIsARActive] = useState(false)
     const touchHandlerSetupRef = useRef(false)
 
@@ -740,7 +868,7 @@ function ARScene({ onCanvasClick, onARStateChange, faceList }) {
 
     return (
         <>
-            <MultipleFaces isARMode={true} onCanvasClick={onCanvasClick} faceList={faceList} />
+            <MultipleFaces isARMode={true} onCanvasClick={onCanvasClick} faceList={faceList} bossPath={bossPath} />
             <ambientLight intensity={0.5} />
             <directionalLight position={[10, 10, 5]} intensity={1} />
         </>
@@ -754,7 +882,7 @@ function SimpleARButton({ isSupported }) {
 
     if (!isSupported) {
         return (
-            <button className="bg-gray-500 text-white font-bold py-2 px-4 rounded" disabled>
+            <button className="bg-black text-white font-bold py-2 px-4 rounded border border-white" disabled>
                 AR Not Supported - Viewing 3D Scene
             </button>
         )
@@ -765,7 +893,7 @@ function SimpleARButton({ isSupported }) {
             className="w-full h-full bg-transparent text-white font-bold text-lg flex flex-col items-center justify-center hover:bg-black hover:bg-opacity-20 transition-colors duration-200"
             onClick={startAR}
         >
-            <div className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg mb-4 pointer-events-none">
+            <div className="bg-black hover:bg-gray-800 text-white font-bold py-4 px-8 rounded-lg mb-4 pointer-events-none border border-white">
                 Tap Anywhere to Start AR
             </div>
             <div className="text-sm opacity-75 text-center max-w-md pointer-events-none">
@@ -782,14 +910,23 @@ export default function ARPage() {
     const canvasClickHandlerRef = useRef(null)
 
     const [faceList, setFaceList] = useState(null)
+    const [bossPath, setBossPath] = useState(null)
 
     useEffect(() => {
         const facesParam = searchParams.get('faces')
+        const bossParam = searchParams.get('bossPath')
+
         if (facesParam) {
             const faceImages = facesParam.split(',').map(face => face.trim()).filter(face => face.length > 0)
             setFaceList(faceImages)
         } else {
             setFaceList(null)
+        }
+
+        if (bossParam) {
+            setBossPath(bossParam.trim())
+        } else {
+            setBossPath(null)
         }
     }, [searchParams])
 
@@ -852,12 +989,14 @@ export default function ARPage() {
                                 onCanvasClick={canvasClickHandlerRef}
                                 onARStateChange={setIsARActive}
                                 faceList={faceList}
+                                bossPath={bossPath}
                             />
                         </XR>
                     ) : (
                         <Fallback3DScene
                             onCanvasClick={canvasClickHandlerRef}
                             faceList={faceList}
+                            bossPath={bossPath}
                         />
                     )}
                 </Canvas>
@@ -872,7 +1011,7 @@ export default function ARPage() {
                                     Tap the screen to throw spheres in AR!
                                 </p>
                                 <button
-                                    className="bg-red-500 text-white px-4 py-2 rounded mt-2 pointer-events-auto"
+                                    className="bg-black text-white px-4 py-2 rounded mt-2 pointer-events-auto border border-white hover:bg-gray-800"
                                     onClick={() => {
                                         if (canvasClickHandlerRef.current) {
                                             canvasClickHandlerRef.current()

@@ -198,22 +198,22 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
                   <img
                     src={place.faceImage}
                     alt="Character face"
-                    className="w-16 h-16 rounded-full mx-auto border-2 border-gray-300"
+                    className="w-16 h-16 rounded-full mx-auto border-2 border-black"
                   />
                 </div>
                 <strong>{place.name}</strong>
                 <br />
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-gray-800">
                   {capitalizeFirst(place.type)}
                 </span>
                 <br />
-                <span className="text-xs text-blue-600">
+                <span className="text-xs text-black">
                   {(distanceToPlace * 1000).toFixed(0)}m away
                 </span>
                 {place.tags?.cuisine && (
                   <>
                     <br />
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-600">
                       Cuisine: {place.tags.cuisine}
                     </span>
                   </>
@@ -221,7 +221,7 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
                 {place.tags?.opening_hours && (
                   <>
                     <br />
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-600">
                       Hours: {place.tags.opening_hours}
                     </span>
                   </>
@@ -233,16 +233,16 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
       })}
 
       {isLoading && (
-        <div className="absolute top-4 right-4 z-[1000] bg-white bg-opacity-90 px-3 py-2 rounded-lg shadow-lg">
+        <div className="absolute top-4 right-4 z-[1000] bg-white bg-opacity-90 px-3 py-2 rounded-lg shadow-lg border border-black">
           <div className="flex items-center space-x-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            <span className="text-sm text-gray-700">Loading places...</span>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div>
+            <span className="text-sm text-black">Loading places...</span>
           </div>
         </div>
       )}
 
       {error && (
-        <div className="absolute top-4 right-4 z-[1000] bg-red-500 bg-opacity-90 text-white px-3 py-2 rounded-lg shadow-lg">
+        <div className="absolute top-4 right-4 z-[1000] bg-black bg-opacity-90 text-white px-3 py-2 rounded-lg shadow-lg border border-white">
           <span className="text-sm">Error: {error}</span>
         </div>
       )}
