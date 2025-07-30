@@ -8,25 +8,22 @@ import * as THREE from 'three'
 
 const store = createXRStore()
 
-const randomFloat = (min, max) => Math.random() * (max - min) + min;
+const randomFloat = (min, max) => Math.random() * (max - min) + min
 
 function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn }) {
     const meshRef = useRef()
     const velocityRef = useRef({ ...initialVelocity })
     const [hasDespawned, setHasDespawned] = useState(false)
-    const gravity = -9.8 // gravity acceleration
+    const gravity = -9.8
 
     useFrame((state, delta) => {
         if (meshRef.current && !hasDespawned) {
-            // Apply gravity to Y velocity
             velocityRef.current.y += gravity * delta
             
-            // Update position based on velocity
             meshRef.current.position.x += velocityRef.current.x * delta
             meshRef.current.position.y += velocityRef.current.y * delta
             meshRef.current.position.z += velocityRef.current.z * delta
             
-            // Check if sphere has fallen below y=-100
             if (meshRef.current.position.y < -100) {
                 setHasDespawned(true)
                 onDespawn(id)
@@ -80,7 +77,6 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
             )
 
             if (distanceToPlayer < 0.5 && !hasReachedPlayer) {
-                console.log(`Face ${id} has reached the ${isARMode ? 'camera' : 'origin'}!`)
                 setHasReachedPlayer(true)
                 onReachPlayer(id)
                 return
@@ -139,7 +135,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     })
 
     const handleThrowSphere = (cameraPosition, cameraDirection) => {
-        const throwForce = 10 // Adjust this to change throw strength
+        const throwForce = 10
         const sphereId = sphereIdCounter.current++
         
         const newSphere = {
@@ -147,41 +143,27 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
             initialPosition: { ...cameraPosition },
             initialVelocity: {
                 x: cameraDirection.x * throwForce,
-                y: cameraDirection.y * throwForce + 2, // Add some upward velocity for parabola
+                y: cameraDirection.y * throwForce + 2,
                 z: cameraDirection.z * throwForce
             }
         }
         
-        setSpheres(prev => {
-            const updated = [...prev, newSphere]
-            console.log('Total spheres:', updated.length)
-            return updated
-        })
+        setSpheres(prev => [...prev, newSphere])
     }
 
     const handleSphereClick = (camera) => {
-        console.log('handleSphereClick called with camera:', camera)
-        
-        // Ensure we have a valid camera object
         if (!camera || !camera.position || !camera.getWorldDirection) {
-            console.error('Invalid camera object passed to handleSphereClick')
             return
         }
         
-        // Debounce to prevent double-tapping issues
         const now = Date.now()
-        if (now - lastThrowTime.current < 300) { // 300ms debounce
-            console.log('Ignoring rapid tap')
+        if (now - lastThrowTime.current < 300) {
             return
         }
         lastThrowTime.current = now
         
-        // Get camera direction
         const direction = new THREE.Vector3()
         camera.getWorldDirection(direction)
-        
-        console.log('Throwing sphere from position:', camera.position)
-        console.log('In direction:', direction)
         
         handleThrowSphere(
             {
@@ -197,20 +179,15 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
         )
     }
 
-    // Expose the click handler to parent component
     useEffect(() => {
         if (onCanvasClick) {
-            // Always set up the handler with a wrapper that will use the current camera
             onCanvasClick.current = (camera) => {
-                // If camera is provided, use it; otherwise we'll get it from the current frame
                 if (camera) {
                     handleSphereClick(camera)
-                } else {
-                    console.log('No camera provided to click handler')
                 }
             }
         }
-    }, []) // Remove onCanvasClick dependency to prevent frequent re-runs
+    }, [])
 
     useFrame((state) => {
         if (isARMode) {
@@ -220,11 +197,8 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
             }
         }
         
-        // Always ensure the click handler has access to the current camera
         if (onCanvasClick && onCanvasClick.current) {
-            // Override with a wrapper that captures the current camera
             onCanvasClick.current = () => {
-                console.log('Click handler called with camera:', state.camera)
                 handleSphereClick(state.camera)
             }
         }
@@ -331,68 +305,43 @@ function ARScene({ onCanvasClick, onARStateChange }) {
         const isCurrentlyInAR = state.gl.xr && state.gl.xr.isPresenting
         if (isCurrentlyInAR !== isARActive) {
             setIsARActive(isCurrentlyInAR)
-            // Notify parent component of AR state change
             if (onARStateChange) {
                 onARStateChange(isCurrentlyInAR)
             }
-            // Reset touch handler setup flag when AR state changes
             touchHandlerSetupRef.current = false
         }
     })
 
-    // Handle AR touch/tap events with a single, targeted approach
     useEffect(() => {
         if (!isARActive || touchHandlerSetupRef.current) return
 
-        console.log('Setting up AR touch handlers')
-
         const handleARTouch = (event) => {
-            console.log('AR touch detected:', event.type, event.target)
-            console.log('Touch event details:', {
-                clientX: event.touches?.[0]?.clientX,
-                clientY: event.touches?.[0]?.clientY,
-                target: event.target.tagName
-            })
             event.preventDefault()
             event.stopPropagation()
             
-            // Check if handler is available immediately
             if (onCanvasClick && onCanvasClick.current) {
-                console.log('Handler available, calling immediately')
                 onCanvasClick.current()
             } else {
-                console.log('Handler not available immediately, trying with delay')
-                // Add a small delay to ensure the handler is properly set
                 setTimeout(() => {
                     if (onCanvasClick && onCanvasClick.current) {
-                        console.log('Calling sphere throw function after delay')
                         onCanvasClick.current()
-                    } else {
-                        console.log('onCanvasClick handler still not available after delay')
-                        console.log('onCanvasClick:', onCanvasClick)
-                        console.log('onCanvasClick.current:', onCanvasClick?.current)
                     }
                 }, 10)
             }
         }
 
-        // Use only touchstart on the canvas for AR mode
         const canvas = document.querySelector('canvas')
         
         if (canvas) {
-            console.log('Adding touch listener to canvas')
             canvas.addEventListener('touchstart', handleARTouch, { 
                 passive: false, 
                 capture: true 
             })
             touchHandlerSetupRef.current = true
         } else {
-            console.log('Canvas not found for touch handling')
-            // Retry after a short delay
             setTimeout(() => {
                 const retryCanvas = document.querySelector('canvas')
                 if (retryCanvas && !touchHandlerSetupRef.current) {
-                    console.log('Retry: Adding touch listener to canvas')
                     retryCanvas.addEventListener('touchstart', handleARTouch, { 
                         passive: false, 
                         capture: true 
@@ -402,12 +351,8 @@ function ARScene({ onCanvasClick, onARStateChange }) {
             }, 100)
         }
 
-        // Also add a backup listener to the document for AR mode
-        console.log('Adding backup touch listener to document')
         const handleDocumentTouch = (event) => {
-            // Only handle if we're in AR and touching the canvas area
             if (event.target.tagName === 'CANVAS') {
-                console.log('Backup document touch handler triggered')
                 handleARTouch(event)
             }
         }
@@ -417,50 +362,36 @@ function ARScene({ onCanvasClick, onARStateChange }) {
             capture: true 
         })
 
-        // Add an even more aggressive global touch handler as a last resort
         const handleGlobalTouch = (event) => {
-            console.log('Global touch detected in AR mode, target:', event.target.tagName)
-            
-            // In AR mode, we want to handle almost any touch that's not on interactive UI elements
             const isInteractiveElement = event.target.tagName === 'BUTTON' || 
                                        event.target.closest('button') ||
                                        event.target.closest('.ar-button-container')
             
             if (!isInteractiveElement) {
-                console.log('Global AR touch handler triggered')
                 event.preventDefault()
                 event.stopPropagation()
                 
                 if (onCanvasClick && onCanvasClick.current) {
-                    console.log('Calling sphere throw from global handler')
                     onCanvasClick.current()
-                } else {
-                    console.log('onCanvasClick handler not available in global touch')
                 }
-            } else {
-                console.log('Touch on interactive element, ignoring')
             }
         }
         
-        // Add to window to catch all touch events
         window.addEventListener('touchstart', handleGlobalTouch, { 
             passive: false, 
             capture: true 
         })
 
         return () => {
-            console.log('Cleaning up AR touch handlers')
             const canvas = document.querySelector('canvas')
             if (canvas) {
                 canvas.removeEventListener('touchstart', handleARTouch, { capture: true })
             }
-            // Clean up the backup document listener too
             document.removeEventListener('touchstart', handleDocumentTouch, { capture: true })
-            // Clean up the global window listener
             window.removeEventListener('touchstart', handleGlobalTouch, { capture: true })
             touchHandlerSetupRef.current = false
         }
-    }, [isARActive]) // Remove onCanvasClick dependency
+    }, [isARActive])
 
     return (
         <>
@@ -513,10 +444,8 @@ export default function ARPage() {
     }, [])
 
     const handleCanvasInteraction = (event) => {
-        // Don't handle if we're in AR mode (AR handles its own events)
         if (isARActive) return
         
-        // Only handle the event if we're not clicking on the AR button
         if (event.target.closest('.ar-button-container')) {
             return
         }
@@ -583,7 +512,6 @@ export default function ARPage() {
                                 <button 
                                     className="bg-red-500 text-white px-4 py-2 rounded mt-2 pointer-events-auto"
                                     onClick={() => {
-                                        console.log('Test button clicked')
                                         if (canvasClickHandlerRef.current) {
                                             canvasClickHandlerRef.current()
                                         }
