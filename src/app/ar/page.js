@@ -14,16 +14,16 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn }) {
     const meshRef = useRef()
     const velocityRef = useRef({ ...initialVelocity })
     const [hasDespawned, setHasDespawned] = useState(false)
-    const gravity = -9.8
+    const gravity = -15
 
     useFrame((state, delta) => {
         if (meshRef.current && !hasDespawned) {
             velocityRef.current.y += gravity * delta
-            
+
             meshRef.current.position.x += velocityRef.current.x * delta
             meshRef.current.position.y += velocityRef.current.y * delta
             meshRef.current.position.z += velocityRef.current.z * delta
-            
+
             if (meshRef.current.position.y < -100) {
                 setHasDespawned(true)
                 onDespawn(id)
@@ -50,7 +50,7 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
 
     useFrame((state, delta) => {
         if (meshRef.current && !hasReachedPlayer) {
-            const playerPosition = isARMode 
+            const playerPosition = isARMode
                 ? {
                     x: state.camera.position.x,
                     y: state.camera.position.y,
@@ -115,7 +115,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     const lastThrowTime = useRef(0)
     const [faces, setFaces] = useState(() => {
         const faceImages = ['/faces/face1.png', '/faces/face2.png']
-        
+
         return Array.from({ length: count }, (_, i) => {
             const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5
             const distance = 20
@@ -137,17 +137,17 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     const handleThrowSphere = (cameraPosition, cameraDirection) => {
         const throwForce = 10
         const sphereId = sphereIdCounter.current++
-        
+
         const newSphere = {
             id: sphereId,
             initialPosition: { ...cameraPosition },
             initialVelocity: {
                 x: cameraDirection.x * throwForce,
-                y: cameraDirection.y * throwForce + 2,
+                y: cameraDirection.y * throwForce + 7,
                 z: cameraDirection.z * throwForce
             }
         }
-        
+
         setSpheres(prev => [...prev, newSphere])
     }
 
@@ -155,20 +155,20 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
         if (!camera || !camera.position || !camera.getWorldDirection) {
             return
         }
-        
+
         const now = Date.now()
         if (now - lastThrowTime.current < 300) {
             return
         }
         lastThrowTime.current = now
-        
+
         const direction = new THREE.Vector3()
         camera.getWorldDirection(direction)
-        
+
         handleThrowSphere(
             {
                 x: camera.position.x,
-                y: camera.position.y,
+                y: camera.position.y - 1,
                 z: camera.position.z
             },
             {
@@ -196,7 +196,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
                 setIsARSessionActive(isCurrentlyInAR)
             }
         }
-        
+
         if (onCanvasClick && onCanvasClick.current) {
             onCanvasClick.current = () => {
                 handleSphereClick(state.camera)
@@ -210,7 +210,7 @@ function MultipleFaces({ count, isARMode = false, onCanvasClick }) {
     useEffect(() => {
         const loader = new THREE.TextureLoader()
         const texturePromises = {}
-        
+
         faces.forEach(face => {
             if (!textures[face.faceImage]) {
                 texturePromises[face.faceImage] = new Promise((resolve) => {
@@ -300,7 +300,7 @@ function Fallback3DScene({ onCanvasClick }) {
 function ARScene({ onCanvasClick, onARStateChange }) {
     const [isARActive, setIsARActive] = useState(false)
     const touchHandlerSetupRef = useRef(false)
-    
+
     useFrame((state) => {
         const isCurrentlyInAR = state.gl.xr && state.gl.xr.isPresenting
         if (isCurrentlyInAR !== isARActive) {
@@ -318,7 +318,7 @@ function ARScene({ onCanvasClick, onARStateChange }) {
         const handleARTouch = (event) => {
             event.preventDefault()
             event.stopPropagation()
-            
+
             if (onCanvasClick && onCanvasClick.current) {
                 onCanvasClick.current()
             } else {
@@ -331,20 +331,20 @@ function ARScene({ onCanvasClick, onARStateChange }) {
         }
 
         const canvas = document.querySelector('canvas')
-        
+
         if (canvas) {
-            canvas.addEventListener('touchstart', handleARTouch, { 
-                passive: false, 
-                capture: true 
+            canvas.addEventListener('touchstart', handleARTouch, {
+                passive: false,
+                capture: true
             })
             touchHandlerSetupRef.current = true
         } else {
             setTimeout(() => {
                 const retryCanvas = document.querySelector('canvas')
                 if (retryCanvas && !touchHandlerSetupRef.current) {
-                    retryCanvas.addEventListener('touchstart', handleARTouch, { 
-                        passive: false, 
-                        capture: true 
+                    retryCanvas.addEventListener('touchstart', handleARTouch, {
+                        passive: false,
+                        capture: true
                     })
                     touchHandlerSetupRef.current = true
                 }
@@ -356,30 +356,30 @@ function ARScene({ onCanvasClick, onARStateChange }) {
                 handleARTouch(event)
             }
         }
-        
-        document.addEventListener('touchstart', handleDocumentTouch, { 
-            passive: false, 
-            capture: true 
+
+        document.addEventListener('touchstart', handleDocumentTouch, {
+            passive: false,
+            capture: true
         })
 
         const handleGlobalTouch = (event) => {
-            const isInteractiveElement = event.target.tagName === 'BUTTON' || 
-                                       event.target.closest('button') ||
-                                       event.target.closest('.ar-button-container')
-            
+            const isInteractiveElement = event.target.tagName === 'BUTTON' ||
+                event.target.closest('button') ||
+                event.target.closest('.ar-button-container')
+
             if (!isInteractiveElement) {
                 event.preventDefault()
                 event.stopPropagation()
-                
+
                 if (onCanvasClick && onCanvasClick.current) {
                     onCanvasClick.current()
                 }
             }
         }
-        
-        window.addEventListener('touchstart', handleGlobalTouch, { 
-            passive: false, 
-            capture: true 
+
+        window.addEventListener('touchstart', handleGlobalTouch, {
+            passive: false,
+            capture: true
         })
 
         return () => {
@@ -445,14 +445,14 @@ export default function ARPage() {
 
     const handleCanvasInteraction = (event) => {
         if (isARActive) return
-        
+
         if (event.target.closest('.ar-button-container')) {
             return
         }
-        
+
         event.preventDefault()
         event.stopPropagation()
-        
+
         if (canvasClickHandlerRef.current) {
             canvasClickHandlerRef.current()
         }
@@ -475,23 +475,23 @@ export default function ARPage() {
                     <SimpleARButton isSupported={isSupported} />
                 </div>
             )}
-            
+
             {!isSupported && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
                     <SimpleARButton isSupported={isSupported} />
                 </div>
             )}
 
-            <div 
-                onClick={handleCanvasInteraction} 
+            <div
+                onClick={handleCanvasInteraction}
                 onTouchStart={handleCanvasInteraction}
                 style={{ width: '100%', height: '100%' }}
             >
                 <Canvas camera={{ position: [0, 2, 5], fov: 75 }}>
                     {isSupported ? (
                         <XR store={store}>
-                            <ARScene 
-                                onCanvasClick={canvasClickHandlerRef} 
+                            <ARScene
+                                onCanvasClick={canvasClickHandlerRef}
                                 onARStateChange={setIsARActive}
                             />
                         </XR>
@@ -509,7 +509,7 @@ export default function ARPage() {
                                 <p className="text-xs mt-1 opacity-75 pointer-events-none">
                                     Tap the screen to throw spheres in AR!
                                 </p>
-                                <button 
+                                <button
                                     className="bg-red-500 text-white px-4 py-2 rounded mt-2 pointer-events-auto"
                                     onClick={() => {
                                         if (canvasClickHandlerRef.current) {
