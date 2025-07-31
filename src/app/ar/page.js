@@ -521,6 +521,12 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
     const handleFaceHit = (faceId) => {
         const hitFace = faces.find(face => face.id === faceId)
 
+        const soundFiles = ['DHIA-0.wav', 'DHIA-1.wav', 'DHIA-2.wav', 'DHIA-3.wav']
+        const randomSound = soundFiles[Math.floor(Math.random() * soundFiles.length)]
+        const audio = new Audio(`/sounds/${randomSound}`)
+        audio.volume = 0.8
+        audio.play().catch(err => console.log('Audio play failed:', err))
+
         if (hitFace && hitFace.isBoss) {
             console.log(`BOSS FACE ${faceId} WAS HIT! Boss health: ${hitFace.lives} -> ${hitFace.lives - 1}`)
         } else {
