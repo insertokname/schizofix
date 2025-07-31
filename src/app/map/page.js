@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useRef } from 'react'
 import { useLocations } from '../providers/LocationsProvider'
+import { useGameProgress } from '../providers/GameProgressProvider'
 
 const MapComponent = dynamic(() => import('./MapComponent'), {
   ssr: false,
@@ -173,6 +174,7 @@ export default function MapPage() {
   const [joystickMode, setJoystickMode] = useState(false)
 
   const { initializeLocations, initializeBossLocations, isInitialized, bossLocationsInitialized, clearSavedLocations, clearSavedBossLocations } = useLocations()
+  const { gameProgress, resetGameProgress } = useGameProgress()
   const hasInitializedLocations = useRef(false)
   const hasInitializedBossLocations = useRef(false)
   const ignoreGPSUpdates = useRef(false)
@@ -330,6 +332,20 @@ export default function MapPage() {
         </div>
       ) : hasUserLocation ? (
         <>
+          <div className="absolute top-4 right-4 z-[1000] bg-white bg-opacity-90 rounded-lg border-2 border-black p-3 shadow-lg">
+            <div className="text-center text-black">
+              <div className="text-sm font-bold mb-1">Game Progress</div>
+              <div className="text-xs">
+                <div className="mb-1">
+                  Bosses: <span className="font-semibold">{gameProgress?.currentBossNumber || 0}</span>/<span className="font-semibold">{gameProgress?.maxBossNumber || 4}</span>
+                </div>
+                <div>
+                  Enemies: <span className="font-semibold">{gameProgress?.defeatedEnemies || 0}</span>/<span className="font-semibold">{gameProgress?.maxDefeatedEnemies || 2}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="absolute bottom-8 left-4 z-[1000] flex flex-col gap-2">
             <button
               onClick={handleLocationClick}
@@ -356,6 +372,7 @@ export default function MapPage() {
               onClick={() => {
                 clearSavedLocations()
                 clearSavedBossLocations()
+                resetGameProgress()
                 hasInitializedLocations.current = false
                 hasInitializedBossLocations.current = false
                 if (hasUserLocation) {
@@ -364,11 +381,14 @@ export default function MapPage() {
                   hasInitializedLocations.current = true
                   hasInitializedBossLocations.current = true
                 }
+                setTimeout(() => {
+                  window.location.reload()
+                }, 100)
               }}
               className="px-3 py-2 text-sm bg-white text-black border border-black rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
-              title="Clear saved locations and fetch new ones"
+              title="Clear saved locations and game progress, then fetch new ones and refresh the page"
             >
-              Refresh Places
+              Hard reset
             </button>
           </div>
 

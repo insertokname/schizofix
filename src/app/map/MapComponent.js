@@ -43,7 +43,7 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
       const isEnemiesAtMax = gameProgress?.defeatedEnemies >= gameProgress?.maxDefeatedEnemies
 
       if (isEnemiesAtMax) {
-        const nextBoss = getNextBossLocation()
+        const nextBoss = getNextBossLocation(gameProgress?.currentBossNumber || 0, coordinates.lat, coordinates.lng)
         setBossLocation(nextBoss)
         setNearbyPlaces([])
       } else {
@@ -57,7 +57,7 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
         setBossLocation(null)
       }
     }
-  }, [coordinates.lat, coordinates.lng, getLocationsNear, getNextBossLocation, gameProgress?.defeatedEnemies, gameProgress?.maxDefeatedEnemies])
+  }, [coordinates.lat, coordinates.lng, getLocationsNear, getNextBossLocation, gameProgress?.defeatedEnemies, gameProgress?.maxDefeatedEnemies, gameProgress?.currentBossNumber])
 
   useEffect(() => {
     if (coordinates.lat && coordinates.lng && !hasRedirected) {
@@ -233,19 +233,6 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
         >
           <Popup>
             <div className="text-center">
-              <div className="mb-2">
-                <img
-                  src={bossLocation.bossImage}
-                  alt="Boss face"
-                  className="w-16 h-16 rounded-full mx-auto border-2 border-red-500"
-                />
-              </div>
-              <strong className="text-red-600">BOSS: {bossLocation.name}</strong>
-              <br />
-              <span className="text-sm text-red-800">
-                {capitalizeFirst(bossLocation.type)}
-              </span>
-              <br />
               <span className="text-xs text-black">
                 {(calculateDistance(
                   coordinates.lat,
@@ -253,10 +240,6 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
                   bossLocation.lat,
                   bossLocation.lng
                 ) * 1000).toFixed(0)}m away
-              </span>
-              <br />
-              <span className="text-xs text-red-600 font-bold">
-                Boss Battle Location!
               </span>
             </div>
           </Popup>
@@ -279,38 +262,9 @@ export default function MapComponent({ coordinates, hasUserLocation, initialCent
           >
             <Popup>
               <div className="text-center">
-                <div className="mb-2">
-                  <img
-                    src={place.faceImage}
-                    alt="Character face"
-                    className="w-16 h-16 rounded-full mx-auto border-2 border-black"
-                  />
-                </div>
-                <strong>{place.name}</strong>
-                <br />
-                <span className="text-sm text-gray-800">
-                  {capitalizeFirst(place.type)}
-                </span>
-                <br />
                 <span className="text-xs text-black">
                   {(distanceToPlace * 1000).toFixed(0)}m away
                 </span>
-                {place.tags?.cuisine && (
-                  <>
-                    <br />
-                    <span className="text-xs text-gray-600">
-                      Cuisine: {place.tags.cuisine}
-                    </span>
-                  </>
-                )}
-                {place.tags?.opening_hours && (
-                  <>
-                    <br />
-                    <span className="text-xs text-gray-600">
-                      Hours: {place.tags.opening_hours}
-                    </span>
-                  </>
-                )}
               </div>
             </Popup>
           </Marker>

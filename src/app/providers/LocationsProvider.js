@@ -129,10 +129,7 @@ export function LocationsProvider({ children }) {
 
     const fetchLocations = async (lat, lng) => {
         setIsLoading(true)
-        setError(null
-
-        )
-
+        setError(null)
 
         try {
             const outerRadius = 2000
@@ -192,10 +189,8 @@ export function LocationsProvider({ children }) {
             }).filter(place => {
                 if (!place.lat || !place.lng) return false
 
-                // Calculate distance from user location
-                const distance = calculateDistance(lat, lng, place.lat, place.lng) * 1000 // Convert to meters
+                const distance = calculateDistance(lat, lng, place.lat, place.lng) * 1000
 
-                // Only include places between 100m and 2000m
                 return distance >= innerRadius && distance <= outerRadius
             })
 
@@ -213,7 +208,7 @@ export function LocationsProvider({ children }) {
         setError(null)
 
         try {
-            const outerRadius = 5000 // Larger radius for boss locations
+            const outerRadius = 5000
             const innerRadius = 100
             const query = `
         [out:json][timeout:25];
@@ -264,16 +259,13 @@ export function LocationsProvider({ children }) {
                     name: element.tags?.name || 'Unnamed',
                     type: element.tags?.leisure || 'unknown',
                     tags: element.tags,
-                    bossImage: `/faces/boss${Math.floor(Math.random() * 4) + 1}.png`, // Random boss image
+                    bossImage: `/faces/boss${Math.floor(Math.random() * 4) + 1}.png`,
                     fetchedAt: new Date().toISOString()
                 }
             }).filter(place => {
                 if (!place.lat || !place.lng) return false
 
-                // Calculate distance from user location
-                const distance = calculateDistance(lat, lng, place.lat, place.lng) * 1000 // Convert to meters
-
-                // Only include places between 100m and 5000m
+                const distance = calculateDistance(lat, lng, place.lat, place.lng) * 1000
                 return distance >= innerRadius && distance <= outerRadius
             })
 
@@ -296,7 +288,6 @@ export function LocationsProvider({ children }) {
             const savedBossLocations = getStoredBossLocations()
 
             if (savedBossLocations && Array.isArray(savedBossLocations) && savedBossLocations.length > 0) {
-                // Sort saved boss locations by distance from user
                 const sortedBossLocations = savedBossLocations
                     .map(location => ({
                         ...location,
@@ -308,7 +299,6 @@ export function LocationsProvider({ children }) {
             } else {
                 const newBossLocations = await fetchBossLocations(userLat, userLng)
                 
-                // Sort new boss locations by distance from user
                 const sortedBossLocations = newBossLocations
                     .map(location => ({
                         ...location,
@@ -329,19 +319,27 @@ export function LocationsProvider({ children }) {
         }
     }
 
-    const getNextBossLocation = () => {
-        if (bossLocations.length === 0) return null
-        return bossLocations[0]
-    }
-
-    const moveFirstBossLocationToBack = () => {
-        if (bossLocations.length <= 1) return
-
-        const updatedBossLocations = [...bossLocations.slice(1), bossLocations[0]]
-        setBossLocations(updatedBossLocations)
-        setStoredBossLocations(updatedBossLocations)
+    const getNextBossLocation = (currentBossNumber, userLat, userLng) => {
+        if (!userLat || !userLng) return null
         
-        return updatedBossLocations
+        if (bossLocations.length > currentBossNumber) {
+            const bossLocation = bossLocations[currentBossNumber]
+            return {
+                ...bossLocation,
+                bossImage: `/faces/boss${currentBossNumber + 1}.png`
+            }
+        }
+        
+        if (bossLocations.length > 0) {
+            const lastBossLocation = bossLocations[bossLocations.length - 1]
+            return {
+                ...lastBossLocation,
+                bossImage: `/faces/boss${currentBossNumber + 1}.png`,
+                id: `boss-${currentBossNumber}`
+            }
+        }
+        
+        return null
     }
 
     const initializeLocations = async (userLat, userLng) => {
@@ -409,7 +407,6 @@ export function LocationsProvider({ children }) {
         clearSavedBossLocations,
         getLocationsNear,
         getNextBossLocation,
-        moveFirstBossLocationToBack,
         calculateDistance,
         removeLocation
     }

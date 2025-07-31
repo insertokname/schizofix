@@ -104,6 +104,13 @@ function ThrowableSphere({ initialPosition, initialVelocity, id, onDespawn, face
 
             if (faces && onHitFace) {
                 faces.forEach(face => {
+                    const isBossSpinning = face.isBoss && face.isSpinning && 
+                        face.spinStartTime && 
+                        (Date.now() - face.spinStartTime < face.spinDuration)
+                    
+                    if (isBossSpinning) {
+                        return
+                    }
                     const distance = meshRef.current.position.distanceTo(
                         new THREE.Vector3(face.position.x, face.position.y, face.position.z)
                     )
@@ -265,7 +272,7 @@ function Face({ initialPosition, speed, id, isARMode = false, faceTexture, onRea
 
     return (
         <mesh ref={meshRef} position={[startPosition.x, startPosition.y, startPosition.z]}>
-            <planeGeometry args={[2, 2]} />
+            <planeGeometry args={isBoss ? [2, 4] : [2, 2]} />
             <meshBasicMaterial map={faceTexture} transparent={true} side={THREE.DoubleSide} />
         </mesh>
     )
@@ -570,12 +577,12 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
                 if (wasBossLevel) {
                     incrementCurrentBossNumber(1)
                     console.log(`Boss level completed! Boss number incremented.`)
+                    router.push(`/chat?bossPath=${encodeURIComponent(bossPath)}`)
                 } else {
                     incrementDefeatedEnemies(1)
                     console.log(`Normal face level completed! Defeated enemies incremented.`)
+                    router.push('/map')
                 }
-                
-                router.push('/map');
             };
 
             const faceIndex = prevFaces.findIndex(face => face.id === faceId)
@@ -593,18 +600,21 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
                 const randomFaceImage = defaultFaceList[Math.floor(Math.random() * defaultFaceList.length)]
                 const spawnPosition = generateRandomSpawnPosition()
                 
+                const currentBossNumber = gameProgress?.currentBossNumber || 0
+                const newEnemyHP = Math.floor(currentBossNumber / 2) + 1
+                
                 const newNormalFace = {
                     id: newFaceId,
                     initialPosition: spawnPosition,
                     speed: randomFloat(1.2, 1.5),
                     faceImage: randomFaceImage,
-                    lives: 1,
+                    lives: newEnemyHP,
                     spawnCount: 0,
                     isBoss: false
                 }
                 
                 facesToReturn.push(newNormalFace)
-                console.log(`Spawned new normal face ${newFaceId} with 1 HP due to boss hit!`)
+                console.log(`Spawned new normal face ${newFaceId} with ${newEnemyHP} HP due to boss hit! (Based on ${currentBossNumber} defeated bosses)`)
             } else {
                 console.log(`Face ${faceId} was shot! Lives: ${face.lives} -> ${newLives}`)
             }
@@ -710,10 +720,13 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
         setSpheres(prevSpheres => prevSpheres.filter(sphere => sphere.id !== sphereId))
     }
 
-    // Create face data for collision detection
     const facesForCollision = faces.map(face => ({
         id: face.id,
-        position: facePositions[face.id] || face.initialPosition
+        position: facePositions[face.id] || face.initialPosition,
+        isBoss: face.isBoss,
+        isSpinning: face.initialPosition?.isSpinning,
+        spinStartTime: face.initialPosition?.spinStartTime,
+        spinDuration: face.initialPosition?.spinDuration
     }))
 
     if (isARMode && !isARSessionActive) {
