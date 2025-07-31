@@ -1,6 +1,10 @@
+'use client'
+
 import Image from "next/image";
+import { useGameProgress } from "./providers/GameProgressProvider";
 
 export default function Home() {
+  const { gameProgress } = useGameProgress();
   return (
     <div 
       className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20"
@@ -29,19 +33,30 @@ export default function Home() {
           />
         </div>
 
-        <div className="flex gap-4 items-center flex-row">
+        <div className="flex flex-col gap-4 items-center">
           <a
             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-black text-white gap-2 hover:bg-gray-800 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="/ar"
+            href="/story"
           >
-            AR Demo
+            Start
           </a>
-          <a
-            className="rounded-full border border-solid border-black transition-colors flex items-center justify-center bg-white text-black gap-2 hover:bg-gray-100 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="/map"
-          >
-            Map
-          </a>
+          
+          {gameProgress.playedStory && (
+            <div className="flex gap-4 items-center flex-row">
+              <a
+                className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-black text-white gap-2 hover:bg-gray-800 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
+                href="/ar"
+              >
+                AR Demo
+              </a>
+              <a
+                className="rounded-full border border-solid border-black transition-colors flex items-center justify-center bg-white text-black gap-2 hover:bg-gray-100 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
+                href="/map"
+              >
+                Map
+              </a>
+            </div>
+          )}
         </div>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">

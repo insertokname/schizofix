@@ -54,7 +54,8 @@ const getDefaultGameProgress = () => ({
     defeatedEnemies: 0,
     maxDefeatedEnemies: 2,
     currentBossNumber: 0,
-    maxBossNumber: 4
+    maxBossNumber: 4,
+    playedStory: false
 })
 
 export function GameProgressProvider({ children }) {
@@ -112,6 +113,16 @@ export function GameProgressProvider({ children }) {
         return true
     }
 
+    const setPlayedStory = () => {
+        const updatedProgress = {
+            ...gameProgress,
+            playedStory: true
+        }
+        setGameProgress(updatedProgress)
+        setStoredGameProgress(updatedProgress)
+        return updatedProgress
+    }
+
     const resetGameProgress = () => {
         const defaultProgress = getDefaultGameProgress()
         setGameProgress(defaultProgress)
@@ -132,6 +143,7 @@ export function GameProgressProvider({ children }) {
         incrementDefeatedEnemies,
         incrementCurrentBossNumber,
         setCurrentBossNumber,
+        setPlayedStory,
         resetGameProgress,
         clearSavedGameProgress
     }

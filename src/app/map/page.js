@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { useLocations } from '../providers/LocationsProvider'
 import { useGameProgress } from '../providers/GameProgressProvider'
 
@@ -175,6 +176,7 @@ export default function MapPage() {
 
   const { initializeLocations, initializeBossLocations, isInitialized, bossLocationsInitialized, clearSavedLocations, clearSavedBossLocations } = useLocations()
   const { gameProgress, resetGameProgress } = useGameProgress()
+  const router = useRouter()
   const hasInitializedLocations = useRef(false)
   const hasInitializedBossLocations = useRef(false)
   const ignoreGPSUpdates = useRef(false)
@@ -381,12 +383,13 @@ export default function MapPage() {
                   hasInitializedLocations.current = true
                   hasInitializedBossLocations.current = true
                 }
-                setTimeout(() => {
-                  window.location.reload()
-                }, 100)
+                // setTimeout(() => {
+                //   window.location.reload()
+                // }, 100)
+                router.push('/')
               }}
               className="px-3 py-2 text-sm bg-white text-black border border-black rounded-lg hover:bg-gray-100 transition-colors shadow-lg"
-              title="Clear saved locations and game progress, then fetch new ones and refresh the page"
+              title="Clear saved locations and game progress, then return to home"
             >
               Hard reset
             </button>
