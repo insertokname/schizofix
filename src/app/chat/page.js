@@ -93,7 +93,7 @@ export default function ChatPage() {
                 )}
                 {!bossPath && (
                     <div className="text-white text-center">
-                        <p>No pet loaded</p>
+                        <p></p>
                     </div>
                 )}
             </div>
@@ -112,7 +112,7 @@ export default function ChatPage() {
                         type="text"
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        placeholder="Talk to your pet..."
+                        placeholder="Talk to it..."
                         disabled={isLoading}
                         className="flex-1 bg-black border border-white text-white px-3 py-2 placeholder-gray-400 focus:outline-none focus:border-gray-300 disabled:opacity-50"
                     />

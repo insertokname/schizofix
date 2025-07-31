@@ -302,7 +302,7 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
     const [faces, setFaces] = useState(() => {
         if (bossPath) {
             const bossAngle = randomFloat(0, Math.PI * 2)
-            const bossDistance = randomFloat(10, 15)
+            const bossDistance = randomFloat(15, 20)
             const bossHeight = randomFloat(1, 5)
 
             return [{
@@ -312,7 +312,7 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
                     y: bossHeight,
                     z: Math.sin(bossAngle) * bossDistance
                 },
-                speed: randomFloat(1.5, 1.7),
+                speed: randomFloat(1.2, 1.4),
                 faceImage: bossPath,
                 lives: 4,
                 spawnCount: 0,
@@ -329,7 +329,7 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
 
             return allFaceImages.map((faceImage, i) => {
                 const angle = (Math.PI * 2 * i) / allFaceImages.length + randomFloat(0, 0.5)
-                const distance = 10
+                const distance = 20
                 const height = randomFloat(1, 5)
 
                 return {
@@ -339,7 +339,7 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
                         y: height,
                         z: Math.sin(angle) * distance
                     },
-                    speed: randomFloat(1.2, 1.5),
+                    speed: randomFloat(1, 1.2),
                     faceImage: faceImage,
                     lives: 2,
                     spawnCount: 0,
@@ -606,7 +606,7 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
                 const newNormalFace = {
                     id: newFaceId,
                     initialPosition: spawnPosition,
-                    speed: randomFloat(1.2, 1.5),
+                    speed: randomFloat(1, 1.2),
                     faceImage: randomFaceImage,
                     lives: newEnemyHP,
                     spawnCount: 0,
@@ -701,7 +701,7 @@ function MultipleFaces({ faceList, bossPath, isARMode = false, onCanvasClick }) 
                 initialPosition: face.isBoss 
                     ? (newLives === 2 ? generateRandomSpawnPosition() : generateBossSpinPosition(facePositions[faceId] || face.initialPosition))
                     : generateRandomSpawnPosition(),
-                speed: face.isBoss ? randomFloat(1.5, 1.7) : randomFloat(1.2, 1.5),
+                speed: face.isBoss ? randomFloat(1.2, 1.4) : randomFloat(1, 1.2),
                 spawnCount: face.spawnCount + 1,
                 isBoss: face.isBoss
             }
